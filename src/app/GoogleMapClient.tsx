@@ -63,6 +63,22 @@ export default function GoogleMapClient() {
         console.log('API 응답:', data);
         console.log('마커 개수:', data.data?.length || 0);
         
+        // 첫 번째 마커의 썸네일 이미지 URL 확인
+        if (data.data && data.data.length > 0) {
+          const firstMarker = data.data[0];
+          console.log('첫 번째 마커 썸네일:', firstMarker.thumbnailImg);
+          const testImageUrl = getFullImageUrl(firstMarker.thumbnailImg);
+          console.log('테스트 이미지 URL:', testImageUrl);
+          
+          // 이미지 로딩 테스트
+          if (testImageUrl) {
+            const img = new Image();
+            img.onload = () => console.log('이미지 로딩 성공:', testImageUrl);
+            img.onerror = () => console.log('이미지 로딩 실패:', testImageUrl);
+            img.src = testImageUrl;
+          }
+        }
+        
         setMarkers(data.data || []);
       } catch (error) {
         console.error('마커 데이터를 가져오는데 실패했습니다:', error);
@@ -89,6 +105,20 @@ export default function GoogleMapClient() {
       }
     }
   }, []);
+  // S3 URL 처리 함수
+const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
+    if (!imageUrl || typeof imageUrl !== 'string' || imageUrl.trim() === '') {
+      return imageUrl; // undefined나 빈 문자열이면 그대로 반환
+    }
+    
+    // 이미 http로 시작하면 그대로 반환
+    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+      return imageUrl;
+    }
+    
+    // http로 시작하지 않으면 S3 URL 앞에 붙여서 반환
+    return `https://bigpicture-jun-dev.s3.ap-northeast-2.amazonaws.com${imageUrl}`;
+  };
 
   // 클러스터링 적용
   useEffect(() => {
@@ -100,7 +130,7 @@ export default function GoogleMapClient() {
       currentZoom
     });
     
-    if (mapLoaded && markers.length > 0 && window.google?.maps && currentZoom < 15) {
+    if (mapLoaded && markers.length > 0 && window.google?.maps && currentZoom < 10) {
       console.log('클러스터링 적용 중...');
       
       // 기존 클러스터러 제거
@@ -136,32 +166,41 @@ export default function GoogleMapClient() {
         },
       });
       console.log('클러스터링 완료');
-    } else if (clustererRef.current && currentZoom >= 15) {
+    } else if (clustererRef.current && currentZoom >= 10) {
       // 줌 레벨이 높으면 클러스터링 제거
       clustererRef.current.clearMarkers();
       clustererRef.current = null;
     }
   }, [mapLoaded, markers.length, currentZoom]);
 
-  const customMarkerIcon = (imageUrl: string) => {
+  const createCustomMarkerIcon = useCallback((imageUrl: string) => {
     if (!window.google?.maps) {
       console.log('Google Maps API가 로드되지 않음');
       return undefined;
     }
     
-    const iconUrl = `http://localhost:5500${imageUrl}`;
-    console.log('마커 아이콘 URL:', iconUrl);
+    const fullImageUrl = getFullImageUrl(imageUrl);
+    console.log('마커 아이콘 생성:', fullImageUrl);
     
-    // 줌 레벨에 따라 크기 조정
-    const size = currentZoom >= 15 ? 150 : 50;
-    const anchor = currentZoom >= 15 ? 75 : 25;
+    // fullImageUrl이 undefined이면 기본 마커 사용
+    if (!fullImageUrl) {
+      console.log('이미지 URL이 없어서 기본 마커 사용');
+      return undefined;
+    }
     
-    return {
-      url: iconUrl,
+    // 이미지 크기를 50x50으로 고정
+    const size = 50;
+    const anchor = size / 2;
+    
+    const iconConfig = {
+      url: fullImageUrl,
       scaledSize: new window.google.maps.Size(size, size),
       anchor: new window.google.maps.Point(anchor, anchor),
     };
-  };
+    
+    console.log('아이콘 설정:', iconConfig);
+    return iconConfig;
+  }, [currentZoom]);
 
   const onMapLoad = (map: google.maps.Map) => {
     console.log('맵 로드 완료');
@@ -209,12 +248,19 @@ export default function GoogleMapClient() {
         
         {/* 모든 줌 레벨에서 마커 렌더링 */}
         {markers.map((marker, index) => {
-          console.log(`마커 ${index + 1}:`, { lat: marker.latitude, lng: marker.longitude });
+          console.log(`마커 ${index + 1}:`, { 
+            lat: marker.latitude, 
+            lng: marker.longitude,
+            thumbnail: marker.thumbnailImg 
+          });
+          
+          const icon = createCustomMarkerIcon(marker.thumbnailImg);
+          
           return (
             <Marker
               key={`${marker.id}-${index}`}
               position={{ lat: marker.latitude, lng: marker.longitude }}
-              icon={currentZoom >= 15 ? customMarkerIcon(marker.thumbnailImg) : undefined}
+              icon={icon}
               onClick={() => setSelectedMarker(marker)}
               onLoad={onMarkerLoad}
             />
@@ -229,7 +275,7 @@ export default function GoogleMapClient() {
             <div className="p-2 max-w-xs">
               <div className="flex items-center gap-2 mb-2">
                 <img 
-                  src={`http://localhost:5500${selectedMarker.thumbnailImg}`}
+                  src={getFullImageUrl(selectedMarker.thumbnailImg)}
                   alt="썸네일"
                   className="w-12 h-12 rounded-full object-cover"
                 />
