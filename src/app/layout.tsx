@@ -28,6 +28,25 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         {children}
+        {/* 하단 네비게이션 바 tailwind로 재구현 */}
+        <nav className="fixed bottom-0 left-0 w-full h-16 bg-white border-t border-gray-200 flex justify-between items-center z-50 px-2">
+          <a href="#" className="flex flex-col items-center flex-1 text-xs text-gray-700 hover:text-blue-600" aria-label="홈">
+            <span className="material-icons mb-0.5">home</span>
+            홈
+          </a>
+          <a href="#" className="flex flex-col items-center flex-1 text-xs text-gray-700 hover:text-blue-600" aria-label="랭킹">
+            <span className="material-icons mb-0.5">leaderboard</span>
+            랭킹
+          </a>
+          <a href="#" className="flex flex-col items-center flex-1 text-xs text-gray-700 hover:text-blue-600" aria-label="커뮤니티">
+            <span className="material-icons mb-0.5">forum</span>
+            커뮤니티
+          </a>
+          <a href="#" className="flex flex-col items-center flex-1 text-xs text-gray-700 hover:text-blue-600" aria-label="마이페이지">
+            <span className="material-icons mb-0.5">person</span>
+            마이페이지
+          </a>
+        </nav>
       </body>
     </html>
   );
