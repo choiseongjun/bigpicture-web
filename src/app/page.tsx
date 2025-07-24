@@ -1,33 +1,27 @@
-import Image from "next/image";
 import GoogleMapClient from "./GoogleMapClient";
 
 export default function Home() {
   return (
-    <div className="flex flex-col min-h-screen bg-[#f8fafc] pb-24">
-      {/* 상단 인사/로고 */}
-      <header className="w-full flex flex-col items-center pt-8 pb-4">
-        <Image src="/globe.svg" alt="로고" width={48} height={48} />
-        <h1 className="text-2xl font-bold mt-2">안녕하세요!</h1>
-        <p className="text-gray-500 text-sm mt-1">빅픽처와 함께하는 위치 기반 서비스</p>
+    <div className="flex flex-col h-screen bg-[#f8fafc]">
+      {/* 헤더 */}
+      <header className="flex items-center justify-between px-4 h-14 border-b bg-white shadow-sm z-20">
+        <div className="w-8" /> {/* 왼쪽 여백 */}
+        <div className="text-xl font-bold tracking-wide select-none">bigpicture</div>
+        <button className="w-8 h-8 flex items-center justify-center text-gray-600 hover:text-blue-500">
+          <span className="material-icons">notifications_none</span>
+        </button>
       </header>
-
-      {/* 구글맵 */}
-      <section className="w-full flex justify-center px-4">
-        <div className="w-full max-w-xl rounded-xl overflow-hidden shadow-md border border-gray-200">
-          <GoogleMapClient />
-        </div>
-      </section>
-
-      {/* 주요 버튼 */}
-      <section className="flex justify-center gap-4 mt-6">
-        <button className="bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold shadow hover:bg-blue-700 transition">내 위치</button>
-        <button className="bg-gray-200 text-gray-800 px-4 py-2 rounded-lg font-semibold shadow hover:bg-gray-300 transition">장소 검색</button>
-      </section>
-
-      {/* 안내문구 */}
-      <section className="flex-1 flex flex-col items-center justify-center mt-8">
-        <p className="text-gray-400 text-base">지도를 움직여 원하는 위치를 확인하세요.</p>
-      </section>
+      {/* 필터 바 */}
+      <div className="flex items-center gap-2 px-4 py-2 border-b bg-white z-10">
+        <button className="text-sm font-medium text-blue-600 px-3 py-1 rounded-full bg-blue-50 hover:bg-blue-100">감성태그</button>
+        <button className="text-sm font-medium text-gray-600 px-3 py-1 rounded-full hover:bg-gray-100">인기순</button>
+        <button className="text-sm font-medium text-gray-600 px-3 py-1 rounded-full hover:bg-gray-100">최신순</button>
+      </div>
+      {/* 지도 영역 */}
+      <main className="flex-1 relative min-h-0">
+        <GoogleMapClient />
+      </main>
+      {/* 하단 네비게이션은 layout.tsx에서 고정 */}
     </div>
   );
 }
