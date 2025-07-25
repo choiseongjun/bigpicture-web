@@ -86,6 +86,7 @@ export default function GoogleMapClient() {
   const [clusters, setClusters] = useState<ClusterData[]>([]);
   const [isClusterLoading, setIsClusterLoading] = useState(false);
   const clusterDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const [showMyMarkers, setShowMyMarkers] = useState(false);
 
   // 감성태그 입력 핸들러
   const handleEmotionInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -299,7 +300,7 @@ export default function GoogleMapClient() {
   }, []);
 
   // 클러스터 API로 데이터 fetch
-  const fetchClusters = useCallback(async (bounds: google.maps.LatLngBounds | null) => {
+  const fetchClusters = useCallback(async (bounds: google.maps.LatLngBounds | null, myOnly = false) => {
     if (!bounds) return;
     const ne = bounds.getNorthEast();
     const sw = bounds.getSouthWest();
@@ -310,7 +311,8 @@ export default function GoogleMapClient() {
     const limit = 500;
     try {
       setIsClusterLoading(true);
-      const response = await apiClient.get(`/markers/cluster?lat=${lat}&lng=${lng}&lat_delta=${lat_delta}&lng_delta=${lng_delta}&limit=${limit}`);
+      const myParam = myOnly ? '&my=true' : '';
+      const response = await apiClient.get(`/markers/cluster?lat=${lat}&lng=${lng}&lat_delta=${lat_delta}&lng_delta=${lng_delta}&limit=${limit}${myParam}`);
       console.log('클러스터 응답:', response.data);
       setClusters(response.data.data || response.data);
     } catch (e) {
@@ -328,7 +330,7 @@ export default function GoogleMapClient() {
       clearTimeout(clusterDebounceRef.current);
     }
     clusterDebounceRef.current = setTimeout(() => {
-      fetchClusters(bounds ?? null);
+      fetchClusters(bounds ?? null, showMyMarkers);
     }, 500);
   };
 
@@ -722,6 +724,25 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
               <circle cx="12" cy="12" r="4" fill="#2563eb" />
               <path stroke="#2563eb" strokeWidth="2" d="M12 2v2m0 16v2m10-10h-2M4 12H2m15.07-7.07l-1.41 1.41M6.34 17.66l-1.41 1.41m12.02 0l-1.41-1.41M6.34 6.34L4.93 4.93" />
             </svg>
+          </button>
+        </div>
+        {/* 지도 상단 우측에 토글 버튼 추가 */}
+        <div className="absolute top-4 right-4 z-50 flex gap-2">
+          <button
+            className={`px-3 py-1 rounded-full shadow text-sm font-semibold border transition-colors duration-150 ${showMyMarkers ? 'bg-blue-500 text-white border-blue-500' : 'bg-white text-blue-500 border-blue-300 hover:bg-blue-50'}`}
+            onClick={() => {
+              setShowMyMarkers((prev) => {
+                const next = !prev;
+                // 토글 시 즉시 fetch
+                if (mapRef.current) {
+                  const bounds = mapRef.current.getBounds();
+                  fetchClusters(bounds ?? null, !prev);
+                }
+                return next;
+              });
+            }}
+          >
+            {showMyMarkers ? '내 마커만 보기 해제' : '내 마커만 보기'}
           </button>
         </div>
         {/* 검색창 */}

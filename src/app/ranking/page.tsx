@@ -220,231 +220,206 @@ export default function RankingPage() {
     setDetailModalOpen(true);
   };
 
-  return (
-    <div className="min-h-screen bg-gray-50 pb-16">
-      {/* 헤더 */}
-      <div className="bg-white shadow-sm border-b sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-4 py-4">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">🏆 랭킹</h1>
-          
-          {/* 필터 버튼들 */}
-          <div className="flex gap-2">
-            <button
-              onClick={() => setFilter('likes')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-                filter === 'likes' 
-                  ? 'bg-blue-600 text-white' 
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              ❤️ 좋아요 순
-            </button>
-            <button
-              onClick={() => setFilter('views')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-                filter === 'views' 
-                  ? 'bg-blue-600 text-white' 
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              👁️ 조회수 순
-            </button>
-            <button
-              onClick={() => setFilter('recent')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-                filter === 'recent' 
-                  ? 'bg-blue-600 text-white' 
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              ⏰ 최신 순
-            </button>
-          </div>
-        </div>
-      </div>
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString();
+  };
 
-      {/* 랭킹 리스트 */}
-      <div className="max-w-6xl mx-auto px-4 py-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {markers.map((marker, index) => (
+  const getFullImageUrl = (url: string) => {
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    }
+    return `https://images.unsplash.com/photo-${url.split('/').pop()}`;
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white py-6 px-2">
+      <div className="max-w-2xl mx-auto">
+        <h2 className="text-2xl font-bold mb-6 text-center text-blue-700 tracking-tight">🏆 랭킹</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          {markers.map((marker, idx) => (
             <div
               key={marker.id}
-              className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition cursor-pointer relative"
-              onClick={() => handleMarkerClick(marker)}
+              className="relative bg-white rounded-3xl shadow-lg hover:shadow-2xl transition-shadow duration-200 flex flex-col overflow-hidden group border border-blue-100"
             >
-              {/* 랭킹 순위 */}
-              <div className="absolute top-2 left-2 z-10">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                  index < 3 
-                    ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-white' 
-                    : 'bg-gray-200 text-gray-700'
-                }`}>
-                  {index + 1}
+              {/* 랭킹 뱃지 */}
+              <div className="absolute -top-3 -left-3 z-10">
+                <div className="bg-gradient-to-r from-yellow-400 to-pink-400 text-white font-bold rounded-full px-4 py-1 shadow text-lg border-2 border-white">
+                  #{idx + 1}
                 </div>
               </div>
-
-              {/* 썸네일 */}
-              <div className="relative h-48 bg-gray-100">
+              {/* 프로필/작성자 */}
+              <div className="flex items-center gap-2 px-4 pt-4 pb-2">
+                <div className="w-9 h-9 rounded-full bg-blue-200 flex items-center justify-center text-lg font-bold text-white shadow">
+                  {marker.author?.[0] || 'U'}
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-sm font-semibold text-gray-700">{marker.author}</span>
+                  <span className="text-xs text-gray-400">{formatDate(marker.createdAt)}</span>
+                </div>
+              </div>
+              {/* 썸네일 이미지 */}
+              <div className="w-full aspect-square bg-gray-100 flex items-center justify-center overflow-hidden">
                 <img
-                  src={marker.thumbnailImg}
+                  src={getFullImageUrl(marker.thumbnailImg)}
                   alt="썸네일"
-                  className="w-full h-full object-cover"
+                  className="object-cover w-full h-full transition-transform duration-200 group-hover:scale-105"
+                  onClick={() => handleMarkerClick(marker)}
+                  style={{ cursor: 'pointer' }}
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
               </div>
-
-              {/* 정보 */}
-              <div className="p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="font-semibold text-sm text-gray-900">{marker.author}</span>
-                  <span className="text-xs text-gray-500">
-                    {new Date(marker.createdAt).toLocaleDateString()}
-                  </span>
-                </div>
-
-                {/* 감성태그 */}
-                <div className="flex flex-wrap gap-1 mb-2">
-                  {marker.emotionTag && marker.emotionTag.split(',').map((tag, idx) => (
-                    <span key={idx} className="inline-flex items-center px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
-                      #{tag}
-                    </span>
+              {/* 상세 이미지 그리드 */}
+              {marker.images && marker.images.length > 0 && (
+                <div className="grid grid-cols-2 gap-1 px-4 pt-2 pb-1">
+                  {marker.images.slice(0, 4).map((img, i) => (
+                    <img
+                      key={img.imageUrl + i}
+                      src={getFullImageUrl(img.imageUrl)}
+                      alt="상세"
+                      className="object-cover w-full h-20 rounded-lg border border-gray-100 shadow-sm hover:scale-105 transition-transform duration-200"
+                      onClick={() => handleMarkerClick(marker)}
+                      style={{ cursor: 'pointer' }}
+                    />
                   ))}
                 </div>
-
-                {/* 설명 */}
-                <p className="text-sm text-gray-700 mb-3 line-clamp-2">
+              )}
+              {/* 감성태그 칩 */}
+              <div className="flex flex-wrap gap-1 px-4 pt-2">
+                {(marker.emotionTag || '').split(',').filter(Boolean).map((tag, i) => (
+                  <span
+                    key={tag + i}
+                    className="bg-pink-100 text-pink-600 text-xs font-semibold px-2 py-0.5 rounded-full shadow-sm"
+                  >
+                    {tag.trim()}
+                  </span>
+                ))}
+              </div>
+              {/* 설명 */}
+              <div className="px-4 pt-2 pb-1">
+                <div className="text-gray-800 text-sm font-medium line-clamp-2 whitespace-pre-line">
                   {marker.description}
-                </p>
-
-                {/* 좋아요/조회수 */}
-                <div className="flex justify-between text-xs text-gray-500">
-                  <span className="flex items-center gap-1">
-                    <span className="text-red-500">❤️</span>
+                </div>
+              </div>
+              {/* 좋아요/조회수 */}
+              <div className="flex items-center justify-between px-4 pb-4 pt-2">
+                <div className="flex items-center gap-3">
+                  <span className="flex items-center gap-1 text-pink-500 font-bold">
+                    <svg width="18" height="18" fill="none" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41 0.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="currentColor"/></svg>
                     {marker.likes}
                   </span>
-                  <span className="flex items-center gap-1">
-                    <span>👁️</span>
+                  <span className="flex items-center gap-1 text-blue-400 font-bold">
+                    <svg width="18" height="18" fill="none" viewBox="0 0 24 24"><path d="M12 4.5c-7.33 0-10 6.28-10 7.5s2.67 7.5 10 7.5 10-6.28 10-7.5-2.67-7.5-10-7.5zm0 13c-5.05 0-8.13-4.32-8.82-5.5C3.87 9.82 6.95 5.5 12 5.5s8.13 4.32 8.82 5.5c-0.69 1.18-3.77 5.5-8.82 5.5z" fill="currentColor"/></svg>
                     {marker.views}
                   </span>
                 </div>
+                <button
+                  className="text-xs text-blue-500 font-semibold hover:underline"
+                  onClick={() => handleMarkerClick(marker)}
+                >
+                  상세보기
+                </button>
               </div>
             </div>
           ))}
         </div>
-
-        {/* 로딩 */}
-        {loading && (
-          <div className="text-center py-8">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <p className="mt-2 text-gray-600">로딩 중...</p>
-          </div>
-        )}
-
-        {/* 더 이상 데이터 없음 */}
-        {!loading && markers.length > 0 && (
-          <div className="text-center py-8">
-            <p className="text-gray-600">모든 랭킹을 확인했습니다!</p>
+        {/* 상세 모달 등 기존 코드 유지 */}
+        {detailModalOpen && selectedMarker && (
+          <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/70">
+            <div className="relative bg-white rounded-3xl shadow-2xl max-w-lg w-full flex flex-col overflow-hidden border border-blue-100">
+              <button 
+                className="absolute top-4 right-4 text-3xl text-blue-400 hover:text-blue-700 z-10 bg-white rounded-full shadow p-2 transition" 
+                onClick={() => setDetailModalOpen(false)}
+              >
+                &times;
+              </button>
+              
+              {/* 이미지 슬라이드 */}
+              <div className="flex flex-col items-center justify-center bg-gradient-to-b from-blue-50 to-white" style={{ minHeight: '320px' }}>
+                {/* 썸네일 이미지 (고정 표시) */}
+                {detailModalImages.length > 0 && (
+                  <img
+                    src={detailModalImages[0]}
+                    alt="썸네일"
+                    className="max-h-72 max-w-full rounded-2xl object-contain shadow-lg border-2 border-blue-100 mt-8 mb-3 transition-all duration-200"
+                  />
+                )}
+                
+                {/* 상세 이미지 확대 영역 */}
+                {detailModalImages.length > 1 && (
+                  <div className="w-full px-4">
+                    <div className="text-center mb-2">
+                      <span className="text-sm font-semibold text-blue-700">상세 이미지</span>
+                    </div>
+                    {/* 상세이미지 확대 표시 */}
+                    <div className="mb-3 flex justify-center items-center">
+                      <img
+                        src={detailModalImages[detailModalIndex]}
+                        alt={`상세이미지${detailModalIndex}`}
+                        className="max-h-48 max-w-full rounded-xl object-contain shadow-md border border-gray-200"
+                      />
+                    </div>
+                    {/* 상세이미지 썸네일 리스트 */}
+                    <div className="flex gap-2 flex-wrap justify-center mb-4">
+                      {detailModalImages.slice(1).map((img, idx) => (
+                        <img
+                          key={idx}
+                          src={img}
+                          alt={`상세이미지${idx+1}`}
+                          className={`w-14 h-14 object-cover rounded-lg border-2 cursor-pointer transition-all duration-150 ${detailModalIndex===idx+1 ? 'ring-2 ring-blue-500 border-blue-500 scale-105' : 'border-gray-200'}`}
+                          onClick={() => setDetailModalIndex(idx+1)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              {/* 정보 카드 */}
+              <div className="p-6 flex flex-col gap-3 border-t border-blue-100 bg-white">
+                <div className="flex items-center gap-3 mb-2">
+                  <span className="font-semibold text-lg text-blue-700 flex items-center gap-1">
+                    <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                    {selectedMarker.author}
+                  </span>
+                  <span className="text-xs text-gray-400 flex items-center gap-1">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    {new Date(selectedMarker.createdAt).toLocaleDateString()}
+                  </span>
+                </div>
+                <div className="flex gap-2 flex-wrap mb-2">
+                  {/* 감성태그 chip */}
+                  {selectedMarker.emotionTag && selectedMarker.emotionTag.split(',').map((tag, idx) => (
+                    <span key={idx} className="inline-flex items-center px-3 py-1 bg-gradient-to-r from-pink-200 via-blue-100 to-yellow-100 text-blue-700 rounded-full text-sm font-semibold shadow-sm border border-blue-200 mr-2 mb-2">
+                      #{tag}
+                    </span>
+                  ))}
+                </div>
+                <div className="text-lg text-gray-800 mb-2 whitespace-pre-line font-medium leading-relaxed">
+                  {selectedMarker.description}
+                </div>
+                <div className="flex gap-6 text-gray-500 text-base mt-2 border-t border-blue-50 pt-3">
+                  <span className="flex items-center gap-1">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 15a7 7 0 0014 0M12 10v4m0 0h4m-4 0H8" />
+                    </svg>
+                    {selectedMarker.likes}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    {selectedMarker.views}
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>
-
-      {/* 상세정보 모달 */}
-      {detailModalOpen && selectedMarker && (
-        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/70">
-          <div className="relative bg-white rounded-3xl shadow-2xl max-w-lg w-full flex flex-col overflow-hidden border border-blue-100">
-            <button 
-              className="absolute top-4 right-4 text-3xl text-blue-400 hover:text-blue-700 z-10 bg-white rounded-full shadow p-2 transition" 
-              onClick={() => setDetailModalOpen(false)}
-            >
-              &times;
-            </button>
-            
-            {/* 이미지 슬라이드 */}
-            <div className="flex flex-col items-center justify-center bg-gradient-to-b from-blue-50 to-white" style={{ minHeight: '320px' }}>
-              {/* 썸네일 이미지 (고정 표시) */}
-              {detailModalImages.length > 0 && (
-                <img
-                  src={detailModalImages[0]}
-                  alt="썸네일"
-                  className="max-h-72 max-w-full rounded-2xl object-contain shadow-lg border-2 border-blue-100 mt-8 mb-3 transition-all duration-200"
-                />
-              )}
-              
-              {/* 상세 이미지 확대 영역 */}
-              {detailModalImages.length > 1 && (
-                <div className="w-full px-4">
-                  <div className="text-center mb-2">
-                    <span className="text-sm font-semibold text-blue-700">상세 이미지</span>
-                  </div>
-                  {/* 상세이미지 확대 표시 */}
-                  <div className="mb-3 flex justify-center items-center">
-                    <img
-                      src={detailModalImages[detailModalIndex]}
-                      alt={`상세이미지${detailModalIndex}`}
-                      className="max-h-48 max-w-full rounded-xl object-contain shadow-md border border-gray-200"
-                    />
-                  </div>
-                  {/* 상세이미지 썸네일 리스트 */}
-                  <div className="flex gap-2 flex-wrap justify-center mb-4">
-                    {detailModalImages.slice(1).map((img, idx) => (
-                      <img
-                        key={idx}
-                        src={img}
-                        alt={`상세이미지${idx+1}`}
-                        className={`w-14 h-14 object-cover rounded-lg border-2 cursor-pointer transition-all duration-150 ${detailModalIndex===idx+1 ? 'ring-2 ring-blue-500 border-blue-500 scale-105' : 'border-gray-200'}`}
-                        onClick={() => setDetailModalIndex(idx+1)}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-            
-            {/* 정보 카드 */}
-            <div className="p-6 flex flex-col gap-3 border-t border-blue-100 bg-white">
-              <div className="flex items-center gap-3 mb-2">
-                <span className="font-semibold text-lg text-blue-700 flex items-center gap-1">
-                  <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
-                  {selectedMarker.author}
-                </span>
-                <span className="text-xs text-gray-400 flex items-center gap-1">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                  {new Date(selectedMarker.createdAt).toLocaleDateString()}
-                </span>
-              </div>
-              <div className="flex gap-2 flex-wrap mb-2">
-                {/* 감성태그 chip */}
-                {selectedMarker.emotionTag && selectedMarker.emotionTag.split(',').map((tag, idx) => (
-                  <span key={idx} className="inline-flex items-center px-3 py-1 bg-gradient-to-r from-pink-200 via-blue-100 to-yellow-100 text-blue-700 rounded-full text-sm font-semibold shadow-sm border border-blue-200 mr-2 mb-2">
-                    #{tag}
-                  </span>
-                ))}
-              </div>
-              <div className="text-lg text-gray-800 mb-2 whitespace-pre-line font-medium leading-relaxed">
-                {selectedMarker.description}
-              </div>
-              <div className="flex gap-6 text-gray-500 text-base mt-2 border-t border-blue-50 pt-3">
-                <span className="flex items-center gap-1">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 15a7 7 0 0014 0M12 10v4m0 0h4m-4 0H8" />
-                  </svg>
-                  {selectedMarker.likes}
-                </span>
-                <span className="flex items-center gap-1">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                  {selectedMarker.views}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 } 
