@@ -1328,36 +1328,43 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
             {/* 이미지 섹션 */}
             <div className="bg-gradient-to-b from-blue-50 to-white p-6">
               {/* 썸네일 이미지 */}
-              {detailModalImages.length > 0 && (
-                <div className="mb-6">
-                  <h3 className="text-lg font-semibold text-blue-700 mb-3 text-center">썸네일</h3>
-                  <div className="flex justify-center">
-                    <img
-                      src={detailModalImages[0]}
-                      alt="썸네일"
-                      className="max-h-64 max-w-full rounded-2xl object-contain shadow-lg border-2 border-blue-100"
-                    />
+              {(() => {
+                const thumbnail = detailModalMarker.images?.find(img => img.imageType === 'thumbnail');
+                return thumbnail ? (
+                  <div className="mb-6">
+                    <h3 className="text-lg font-semibold text-blue-700 mb-3 text-center">썸네일</h3>
+                    <div className="flex justify-center">
+                      <img
+                        src={getFullImageUrl(thumbnail.imageUrl)}
+                        alt="썸네일"
+                        className="max-h-64 max-w-full rounded-2xl object-contain shadow-lg border-2 border-blue-100"
+                      />
+                    </div>
                   </div>
-                </div>
-              )}
+                ) : null;
+              })()}
               
               {/* 상세 이미지 그리드 */}
-              {detailModalImages.length >= 0 && (
-                <div>
-                  <h3 className="text-lg font-semibold text-blue-700 mb-3 text-center">상세 이미지</h3>
-                  <div className="grid grid-cols-3 gap-3">
-                    {detailModalImages.slice(1, 4).map((img, idx) => (
-                      <div key={idx} className="aspect-square">
-                        <img
-                          src={img}
-                          alt={`상세이미지${idx+1}`}
-                          className="w-full h-full object-cover rounded-xl shadow-md border border-gray-200"
-                        />
-                      </div>
-                    ))}
+              {(() => {
+                const detailImages = detailModalMarker.images?.filter(img => img.imageType === 'detail' || img.imageType === 'gallery') || [];
+                if (detailImages.length === 0) return null;
+                return (
+                  <div>
+                    <h3 className="text-lg font-semibold text-blue-700 mb-3 text-center">상세 이미지</h3>
+                    <div className="grid grid-cols-3 gap-3">
+                      {detailImages.slice(0, 6).map((img, idx) => (
+                        <div key={idx} className="aspect-square">
+                          <img
+                            src={getFullImageUrl(img.imageUrl)}
+                            alt={`상세이미지${idx+1}`}
+                            className="w-full h-full object-cover rounded-xl shadow-md border border-gray-200"
+                          />
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
             </div>
             {/* 정보 카드 */}
             <div className="p-6 flex flex-col gap-3 border-t border-blue-100 bg-white">
@@ -1388,43 +1395,66 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
           </div>
         </div>
       )}
-      {multiMarkers.length >= 0 && detailModalOpen && (
+      {detailModalOpen && multiMarkers.length > 0 && (
         <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/70">
           <div className="relative bg-white rounded-3xl shadow-2xl max-w-lg w-full flex flex-col overflow-hidden border border-blue-100">
             <button className="absolute top-4 right-4 text-3xl text-blue-400 hover:text-blue-700 z-10 bg-white rounded-full shadow p-2 transition" onClick={() => setDetailModalOpen(false)}>&times;</button>
+            {/* 인덱스/화살표 */}
+            <div className="flex items-center justify-center gap-4 mt-6 mb-2">
+              <button
+                className="text-2xl px-2 py-1 rounded hover:bg-gray-100 disabled:opacity-30"
+                onClick={() => setMultiMarkerIndex(i => Math.max(0, i - 1))}
+                disabled={multiMarkerIndex === 0}
+              >◀</button>
+              <span className="text-base text-gray-500">{multiMarkerIndex + 1} / {multiMarkers.length}</span>
+              <button
+                className="text-2xl px-2 py-1 rounded hover:bg-gray-100 disabled:opacity-30"
+                onClick={() => setMultiMarkerIndex(i => Math.min(multiMarkers.length - 1, i + 1))}
+                disabled={multiMarkerIndex === multiMarkers.length - 1}
+              >▶</button>
+            </div>
             {/* 이미지 섹션 */}
-            <div className="bg-gradient-to-b from-blue-50 to-white p-6">
+            <div className="bg-gradient-to-b from-blue-50 to-white p-6 pt-2">
               {/* 썸네일 이미지 */}
-              {detailModalImages.length > 0 && (
-                <div className="mb-6">
-                  <h3 className="text-lg font-semibold text-blue-700 mb-3 text-center">썸네일</h3>
-                  <div className="flex justify-center">
-                    <img
-                      src={detailModalImages[0]}
-                      alt="썸네일"
-                      className="max-h-64 max-w-full rounded-2xl object-contain shadow-lg border-2 border-blue-100"
-                    />
+              {(() => {
+                const marker = multiMarkers[multiMarkerIndex];
+                const thumbnail = marker.images?.find(img => img.imageType === 'thumbnail');
+                if (!thumbnail) return null;
+                return (
+                  <div className="mb-6">
+                    <h3 className="text-lg font-semibold text-blue-700 mb-3 text-center">썸네일</h3>
+                    <div className="flex justify-center">
+                      <img
+                        src={getFullImageUrl(thumbnail.imageUrl)}
+                        alt="썸네일"
+                        className="max-h-64 max-w-full rounded-2xl object-contain shadow-lg border-2 border-blue-100"
+                      />
+                    </div>
                   </div>
-                </div>
-              )}
-              
+                );
+              })()}
               {/* 상세 이미지 그리드 */}
-              {detailModalImages.length >= 0 && (
-                <div>
-                  <h3 className="text-lg font-semibold text-blue-700 mb-3 text-center">상세 이미지</h3>
-                  <div className="grid grid-cols-3 gap-3">
-                    {detailModalImages.slice(1, 4).map((img, idx) => (
-                      <div key={idx} className="aspect-square">
-                        <img
-                          src={img}
-                          alt={`상세이미지${idx+1}`}
-                          className="w-full h-full object-cover rounded-xl shadow-md border border-gray-200"
-                        />
-                      </div>
-                    ))}
+              {(() => {
+                const marker = multiMarkers[multiMarkerIndex];
+                const detailImages = marker.images?.filter(img => img.imageType === 'detail' || img.imageType === 'gallery') || [];
+                if (detailImages.length === 0) return null;
+                return (
+                  <div>
+                    <h3 className="text-lg font-semibold text-blue-700 mb-3 text-center">상세 이미지</h3>
+                    <div className="grid grid-cols-3 gap-3">
+                      {detailImages.slice(0, 6).map((img, idx) => (
+                        <div key={idx} className="aspect-square">
+                          <img
+                            src={getFullImageUrl(img.imageUrl)}
+                            alt={`상세이미지${idx+1}`}
+                            className="w-full h-full object-cover rounded-xl shadow-md border border-gray-200"
+                          />
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
             </div>
             {/* 정보 카드 */}
             <div className="p-6 flex flex-col gap-3 border-t border-blue-100 bg-white">
@@ -1451,31 +1481,6 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                 <span className="flex items-center gap-1"><svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 15a7 7 0 0014 0M12 10v4m0 0h4m-4 0H8" /></svg> {multiMarkers[multiMarkerIndex].likes}</span>
                 <span className="flex items-center gap-1"><svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg> {multiMarkers[multiMarkerIndex].views}</span>
               </div>
-            </div>
-            <div className="flex justify-between items-center mt-4">
-              <button
-                className="text-lg px-2 py-1 rounded hover:bg-gray-100 disabled:opacity-30"
-                onClick={() => {
-                  setMultiMarkerIndex(i => {
-                    const newIndex = Math.max(0, i - 1);
-                    setSelectedMarker(multiMarkers[newIndex]);
-                    return newIndex;
-                  });
-                }}
-                disabled={multiMarkerIndex === 0}
-              >◀4536436545</button>
-              <span className="text-sm text-gray-500">{multiMarkerIndex + 1} / {multiMarkers.length}</span>
-              <button
-                className="text-lg px-2 py-1 rounded hover:bg-gray-100 disabled:opacity-30"
-                onClick={() => {
-                  setMultiMarkerIndex(i => {
-                    const newIndex = Math.min(multiMarkers.length - 1, i + 1);
-                    setSelectedMarker(multiMarkers[newIndex]);
-                    return newIndex;
-                  });
-                }}
-                disabled={multiMarkerIndex === multiMarkers.length - 1}
-              >▶1213123</button>
             </div>
           </div>
         </div>
