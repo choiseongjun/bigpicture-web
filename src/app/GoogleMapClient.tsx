@@ -1,6 +1,6 @@
 'use client';
 
-import { GoogleMap, Marker, InfoWindow, MarkerClusterer } from '@react-google-maps/api';
+import { GoogleMap, Marker, InfoWindow, MarkerClusterer, OverlayView } from '@react-google-maps/api';
 import { useState, useEffect, useRef, useCallback, ChangeEvent } from 'react';
 import apiClient from './lib/apiClient';
 
@@ -27,7 +27,7 @@ interface MarkerData {
   createdAt: string;
   images: {
     imageUrl: string;
-    imageType: 'thumbnail' | 'detail';
+    imageType: 'thumbnail' | 'detail' | 'gallery';
     imageOrder: number;
     isPrimary: boolean;
   }[];
@@ -701,6 +701,52 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
     setDetailModalOpen(true);
   };
 
+  // 하버사인 공식: 두 위경도 좌표 사이 거리(m)
+  function getDistanceFromLatLonInMeters(lat1: number, lon1: number, lat2: number, lon2: number) {
+    const R = 6371000;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  }
+
+  // 마커 그룹핑: 20미터 이내 마커끼리 그룹핑
+  function groupMarkersByDistance(markers: MarkerData[], threshold = 20) {
+    const groups: MarkerData[][] = [];
+    const used = new Array(markers.length).fill(false);
+    for (let i = 0; i < markers.length; i++) {
+      if (used[i]) continue;
+      const group = [markers[i]];
+      used[i] = true;
+      for (let j = i + 1; j < markers.length; j++) {
+        if (used[j]) continue;
+        const d = getDistanceFromLatLonInMeters(
+          markers[i].latitude,
+          markers[i].longitude,
+          markers[j].latitude,
+          markers[j].longitude
+        );
+        if (d <= threshold) {
+          group.push(markers[j]);
+          used[j] = true;
+        }
+      }
+      groups.push(group);
+    }
+    return groups;
+  }
+
+  // 모든 마커를 1차원 배열로 추출 후 그룹핑
+  const allMarkers = clusters.flatMap(cluster => cluster.markers || []);
+  const markerGroups = groupMarkersByDistance(allMarkers, 20);
+
+  // markerGroups 생성 직후
+  console.log('markerGroups:', markerGroups);
+
   return (
     <div className="w-full h-full absolute inset-0">
         {/* 지도 위 필터 바 */}
@@ -937,18 +983,59 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                 }
               })}
 
-              {!isPlacingMarker && markers.map((marker, index) => {
-                const icon = createCustomMarkerIcon(marker.thumbnailImg);
+              {!isPlacingMarker && markerGroups.map((group, idx) => {
+                if (!group) return null;
+                const mainMarker = group[0];
+                const icon = {
+                  url: getFullImageUrl(mainMarker.thumbnailImg) || 'https://maps.google.com/mapfiles/ms/icons/red-dot.png',
+                  scaledSize: typeof window !== 'undefined' && window.google ? new window.google.maps.Size(48, 48) : undefined,
+                  anchor: typeof window !== 'undefined' && window.google ? new window.google.maps.Point(24, 48) : undefined,
+                };
                 return (
-                  <Marker
-                    key={`${marker.id}-${index}`}
-                    position={{ lat: marker.latitude, lng: marker.longitude }}
-                    icon={icon}
-                    clusterer={clusterer}
-                    onClick={() => setSelectedMarker(marker)}
-                  />
+                  <>
+                    <Marker
+                      key={mainMarker.id + '-group'}
+                      position={{ lat: mainMarker.latitude, lng: mainMarker.longitude }}
+                      icon={icon}
+                      onClick={() => {
+                        setMultiMarkers(group);
+                        setMultiMarkerIndex(0);
+                        setSelectedMarker(group[0]);
+                      }}
+                      options={{ clickable: true, cursor: 'pointer' }}
+                    />
+                    {group.length > 1 && (
+                      <OverlayView
+                        position={{ lat: mainMarker.latitude, lng: mainMarker.longitude }}
+                        mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+                      >
+                        <div style={{ position: 'relative', width: 0, height: 0 }}>
+                          <div style={{
+                            position: 'absolute',
+                            top: '-32px',
+                            right: '-16px',
+                            background: 'linear-gradient(90deg, #2563eb 60%, #60a5fa 100%)',
+                            color: 'white',
+                            borderRadius: '9999px',
+                            padding: '2px 10px',
+                            fontSize: '15px',
+                            fontWeight: 700,
+                            boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                            border: '2px solid white',
+                            zIndex: 10,
+                            cursor: 'pointer',
+                            userSelect: 'none',
+                          }}>
+                            +{group.length - 1}
+                          </div>
+                        </div>
+                      </OverlayView>
+                    )}
+                  </>
                 );
               })}
+
+              {/* markers.map Marker 렌더링 완전히 제거 */}
             </>
           )}
         </MarkerClusterer>
@@ -1000,7 +1087,7 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
           </>
         )}
 
-        {selectedMarker && (
+        {/* {selectedMarker && (
           <InfoWindow
             position={{ lat: selectedMarker.latitude, lng: selectedMarker.longitude }}
             onCloseClick={() => setSelectedMarker(null)}
@@ -1037,6 +1124,79 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                 <span>👁️ {selectedMarker.views}</span>
                 <span>{new Date(selectedMarker.createdAt).toLocaleDateString()}</span>
               </div>
+            </div>
+          </InfoWindow>
+        )} */}
+        {selectedMarker && multiMarkers.length > 0 && (
+          <InfoWindow
+            position={{ lat: selectedMarker.latitude, lng: selectedMarker.longitude }}
+            onCloseClick={() => setSelectedMarker(null)}
+          >
+            <div className="p-2 max-w-xs">
+              <div className="flex items-center justify-between mb-2">
+                <button
+                  className="text-lg px-2 py-1 rounded hover:bg-gray-100 disabled:opacity-30"
+                  onClick={() => setMultiMarkerIndex(i => Math.max(0, i - 1))}
+                  disabled={multiMarkerIndex === 0}
+                >◀</button>
+                <span className="text-sm text-gray-500">{multiMarkerIndex + 1} / {multiMarkers.length}</span>
+                <button
+                  className="text-lg px-2 py-1 rounded hover:bg-gray-100 disabled:opacity-30"
+                  onClick={() => setMultiMarkerIndex(i => Math.min(multiMarkers.length - 1, i + 1))}
+                  disabled={multiMarkerIndex === multiMarkers.length - 1}
+                >▶</button>
+              </div>
+              {/* 썸네일 이미지 */}
+              <div className="flex flex-col items-center gap-1 mb-2">
+                {(() => {
+                  const marker = multiMarkers[multiMarkerIndex];
+                  const thumbnail = marker.images?.find(img => img.imageType === 'thumbnail');
+                  return thumbnail ? (
+                    <img
+                      src={getFullImageUrl(thumbnail.imageUrl)}
+                      alt="썸네일"
+                      className="w-16 h-16 rounded-xl object-cover border-2 border-blue-200 shadow-sm mb-1"
+                    />
+                  ) : null;
+                })()}
+                <div className="font-bold text-[13px] text-blue-900 leading-tight">{multiMarkers[multiMarkerIndex].author}</div>
+                <div className="text-xs text-gray-400">{new Date(multiMarkers[multiMarkerIndex].createdAt).toLocaleDateString()}</div>
+              </div>
+              {/* 상세 이미지 그리드 */}
+              {(() => {
+                const marker = multiMarkers[multiMarkerIndex];
+                const detailImages = marker.images?.filter(img => img.imageType === 'detail' || img.imageType === 'gallery') || [];
+                if (detailImages.length === 0) return null;
+                return (
+                  <div className="grid grid-cols-2 gap-2 mb-2">
+                    {detailImages.slice(0, 4).map((img, idx) => (
+                      <img
+                        key={idx}
+                        src={getFullImageUrl(img.imageUrl)}
+                        alt={`상세이미지${idx+1}`}
+                        className="w-16 h-16 object-cover rounded-lg border"
+                      />
+                    ))}
+                  </div>
+                );
+              })()}
+              <div className="flex flex-wrap gap-1 mb-1">
+                {multiMarkers[multiMarkerIndex].emotionTag && multiMarkers[multiMarkerIndex].emotionTag.split(',').map((tag, idx) => (
+                  <span key={idx} className="inline-flex items-center px-2 py-0.5 bg-gradient-to-r from-pink-100 via-blue-50 to-yellow-100 text-blue-700 rounded-full text-[11px] font-semibold shadow border border-blue-100">#{tag}</span>
+                ))}
+              </div>
+              <p className="text-[13px] text-gray-800 mb-1 leading-snug font-medium truncate">{multiMarkers[multiMarkerIndex].description}</p>
+              <div className="flex justify-between text-[11px] text-gray-400 mt-1 mb-2">
+                <span>❤️ {multiMarkers[multiMarkerIndex].likes}</span>
+                <span>👁️ {multiMarkers[multiMarkerIndex].views}</span>
+              </div>
+              <button
+                className="w-full py-1 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 text-sm"
+                onClick={() => {
+                  setDetailModalMarker(multiMarkers[multiMarkerIndex]);
+                  setDetailModalOpen(true);
+                }}
+              >상세보기</button>
             </div>
           </InfoWindow>
         )}
@@ -1182,7 +1342,7 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
               )}
               
               {/* 상세 이미지 그리드 */}
-              {detailModalImages.length > 1 && (
+              {detailModalImages.length >= 0 && (
                 <div>
                   <h3 className="text-lg font-semibold text-blue-700 mb-3 text-center">상세 이미지</h3>
                   <div className="grid grid-cols-3 gap-3">
@@ -1228,7 +1388,7 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
           </div>
         </div>
       )}
-      {multiMarkers.length > 1 && detailModalOpen && (
+      {multiMarkers.length >= 0 && detailModalOpen && (
         <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/70">
           <div className="relative bg-white rounded-3xl shadow-2xl max-w-lg w-full flex flex-col overflow-hidden border border-blue-100">
             <button className="absolute top-4 right-4 text-3xl text-blue-400 hover:text-blue-700 z-10 bg-white rounded-full shadow p-2 transition" onClick={() => setDetailModalOpen(false)}>&times;</button>
@@ -1249,7 +1409,7 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
               )}
               
               {/* 상세 이미지 그리드 */}
-              {detailModalImages.length > 1 && (
+              {detailModalImages.length >= 0 && (
                 <div>
                   <h3 className="text-lg font-semibold text-blue-700 mb-3 text-center">상세 이미지</h3>
                   <div className="grid grid-cols-3 gap-3">
@@ -1294,16 +1454,28 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
             </div>
             <div className="flex justify-between items-center mt-4">
               <button
+                className="text-lg px-2 py-1 rounded hover:bg-gray-100 disabled:opacity-30"
+                onClick={() => {
+                  setMultiMarkerIndex(i => {
+                    const newIndex = Math.max(0, i - 1);
+                    setSelectedMarker(multiMarkers[newIndex]);
+                    return newIndex;
+                  });
+                }}
                 disabled={multiMarkerIndex === 0}
-                onClick={() => setMultiMarkerIndex(i => Math.max(0, i - 1))}
-                className="px-3 py-1 rounded bg-gray-100 text-gray-700 disabled:opacity-50"
-              >이전</button>
+              >◀4536436545</button>
               <span className="text-sm text-gray-500">{multiMarkerIndex + 1} / {multiMarkers.length}</span>
               <button
+                className="text-lg px-2 py-1 rounded hover:bg-gray-100 disabled:opacity-30"
+                onClick={() => {
+                  setMultiMarkerIndex(i => {
+                    const newIndex = Math.min(multiMarkers.length - 1, i + 1);
+                    setSelectedMarker(multiMarkers[newIndex]);
+                    return newIndex;
+                  });
+                }}
                 disabled={multiMarkerIndex === multiMarkers.length - 1}
-                onClick={() => setMultiMarkerIndex(i => Math.min(multiMarkers.length - 1, i + 1))}
-                className="px-3 py-1 rounded bg-gray-100 text-gray-700 disabled:opacity-50"
-              >다음</button>
+              >▶1213123</button>
             </div>
           </div>
         </div>
