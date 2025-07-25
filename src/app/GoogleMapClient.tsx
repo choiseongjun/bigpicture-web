@@ -742,7 +742,7 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
 
   // 모든 마커를 1차원 배열로 추출 후 그룹핑
   const allMarkers = clusters.flatMap(cluster => cluster.markers || []);
-  const markerGroups = groupMarkersByDistance(allMarkers, 20);
+  const markerGroups = groupMarkersByDistance(allMarkers, 30);
 
   // markerGroups 생성 직후
   console.log('markerGroups:', markerGroups);
@@ -1135,13 +1135,13 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
             <div className="p-2 max-w-xs">
               <div className="flex items-center justify-between mb-2">
                 <button
-                  className="text-lg px-2 py-1 rounded hover:bg-gray-100 disabled:opacity-30"
+                  className="text-lg px-2 py-1 rounded text-black hover:bg-gray-100 "
                   onClick={() => setMultiMarkerIndex(i => Math.max(0, i - 1))}
                   disabled={multiMarkerIndex === 0}
                 >◀</button>
                 <span className="text-sm text-gray-500">{multiMarkerIndex + 1} / {multiMarkers.length}</span>
                 <button
-                  className="text-lg px-2 py-1 rounded hover:bg-gray-100 disabled:opacity-30"
+                  className="text-lg px-2 py-1 rounded hover:bg-gray-100 text-black"
                   onClick={() => setMultiMarkerIndex(i => Math.min(multiMarkers.length - 1, i + 1))}
                   disabled={multiMarkerIndex === multiMarkers.length - 1}
                 >▶</button>
@@ -1396,19 +1396,19 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
         </div>
       )}
       {detailModalOpen && multiMarkers.length > 0 && (
-        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/70">
+        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-white/10">
           <div className="relative bg-white rounded-3xl shadow-2xl max-w-lg w-full flex flex-col overflow-hidden border border-blue-100">
             <button className="absolute top-4 right-4 text-3xl text-blue-400 hover:text-blue-700 z-10 bg-white rounded-full shadow p-2 transition" onClick={() => setDetailModalOpen(false)}>&times;</button>
             {/* 인덱스/화살표 */}
             <div className="flex items-center justify-center gap-4 mt-6 mb-2">
               <button
-                className="text-2xl px-2 py-1 rounded hover:bg-gray-100 disabled:opacity-30"
+                className="text-2xl px-2 py-1 rounded hover:bg-gray-200 disabled:opacity-30 text-black"
                 onClick={() => setMultiMarkerIndex(i => Math.max(0, i - 1))}
                 disabled={multiMarkerIndex === 0}
               >◀</button>
-              <span className="text-base text-gray-500">{multiMarkerIndex + 1} / {multiMarkers.length}</span>
+              <span className="text-base text-gray-700 font-semibold">{multiMarkerIndex + 1} / {multiMarkers.length}</span>
               <button
-                className="text-2xl px-2 py-1 rounded hover:bg-gray-100 disabled:opacity-30"
+                className="text-2xl px-2 py-1 rounded hover:bg-gray-200 disabled:opacity-30 text-black"
                 onClick={() => setMultiMarkerIndex(i => Math.min(multiMarkers.length - 1, i + 1))}
                 disabled={multiMarkerIndex === multiMarkers.length - 1}
               >▶</button>
