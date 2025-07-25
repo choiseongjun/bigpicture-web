@@ -23,6 +23,7 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  
   return (
     <html lang="en">
       <body
@@ -30,24 +31,34 @@ export default function RootLayout({
       >
         {children}
         {/* 하단 네비게이션 바 tailwind로 재구현 */}
-        <nav className="fixed bottom-0 left-0 w-full h-16 bg-white border-t border-gray-200 flex justify-between items-center z-50 px-2">
-          <Link href="/" className="flex flex-col items-center flex-1 text-xs text-gray-700 hover:text-blue-600" aria-label="홈">
-            <span className="material-icons mb-0.5">home</span>
-            홈
+        <nav className="fixed bottom-0 left-0 w-full h-16 bg-white border-t shadow-lg z-20">
+        <div className="flex items-center justify-around h-full">
+          <Link href="/" className="flex flex-col items-center gap-1 text-gray-600 hover:text-blue-600 transition">            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5a2 2 0 012-2h4a2 2 0 012 2v6H8V5z" />
+            </svg>
+            <span className="text-xs">홈</span>
           </Link>
-          <a href="#" className="flex flex-col items-center flex-1 text-xs text-gray-700 hover:text-blue-600" aria-label="랭킹">
-            <span className="material-icons mb-0.5">leaderboard</span>
-            랭킹
-          </a>
-          <a href="#" className="flex flex-col items-center flex-1 text-xs text-gray-700 hover:text-blue-600" aria-label="커뮤니티">
-            <span className="material-icons mb-0.5">forum</span>
-            커뮤니티
-          </a>
-          <Link href="/mypage" className="flex flex-col items-center flex-1 text-xs text-gray-700 hover:text-blue-600" aria-label="마이페이지">
-            <span className="material-icons mb-0.5">person</span>
-            마이페이지
+          <Link href="/ranking" className="flex flex-col items-center gap-1 text-gray-600 hover:text-blue-600 transition">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            <span className="text-xs">랭킹</span>
           </Link>
-        </nav>
+          <Link href="/community" className="flex flex-col items-center gap-1 text-gray-600 hover:text-blue-600 transition">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z" />
+            </svg>
+            <span className="text-xs">커뮤니티</span>
+          </Link>
+          <Link href="/mypage" className="flex flex-col items-center gap-1 text-gray-600 hover:text-blue-600 transition">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+            <span className="text-xs">마이</span>
+          </Link>
+        </div>
+      </nav>
       </body>
     </html>
   );
