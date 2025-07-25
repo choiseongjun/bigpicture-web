@@ -1,7 +1,7 @@
 'use client';
 
 import { GoogleMap, LoadScript, Marker, InfoWindow, MarkerClusterer } from '@react-google-maps/api';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, ChangeEvent } from 'react';
 import apiClient from './lib/apiClient';
 
 const containerStyle = {
@@ -45,6 +45,189 @@ export default function GoogleMapClient() {
   const [placedMarker, setPlacedMarker] = useState<{ lat: number; lng: number } | null>(null);
   const [showPlaceModal, setShowPlaceModal] = useState(false);
   const [showPlaceInfoWindow, setShowPlaceInfoWindow] = useState(false);
+  const [myLocation, setMyLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const watchIdRef = useRef<number | null>(null);
+  const [hasCentered, setHasCentered] = useState(false);
+  // 썸네일/상세이미지 업로드 상태
+  const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
+  const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
+  const [detailFiles, setDetailFiles] = useState<File[]>([]);
+  const [detailPreviews, setDetailPreviews] = useState<string[]>([]);
+  // 업로드된 이미지 URL 상태
+  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
+  const [detailUrls, setDetailUrls] = useState<string[]>([]);
+  const [isThumbnailUploading, setIsThumbnailUploading] = useState(false);
+  const [isDetailUploading, setIsDetailUploading] = useState(false);
+  const [description, setDescription] = useState('');
+  const [emotionInput, setEmotionInput] = useState('');
+  const [emotionTags, setEmotionTags] = useState<string[]>([]);
+  const [imageViewerOpen, setImageViewerOpen] = useState(false);
+  const [imageViewerImages, setImageViewerImages] = useState<string[]>([]);
+  const [imageViewerIndex, setImageViewerIndex] = useState(0);
+
+  // 감성태그 입력 핸들러
+  const handleEmotionInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && emotionInput.trim()) {
+      e.preventDefault();
+      if (!emotionTags.includes(emotionInput.trim())) {
+        setEmotionTags([...emotionTags, emotionInput.trim()]);
+      }
+      setEmotionInput('');
+    }
+  };
+  const handleEmotionInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setEmotionInput(e.target.value);
+  };
+  const handleRemoveEmotionTag = (tag: string) => {
+    setEmotionTags(emotionTags.filter(t => t !== tag));
+  };
+
+  // 저장 버튼 클릭 핸들러
+  const handleSaveMarker = async () => {
+    if (!placedMarker) return;
+    if (!description.trim()) {
+      alert('설명을 입력하세요.');
+      return;
+    }
+    if (emotionTags.length === 0) {
+      alert('감성태그를 1개 이상 입력하세요.');
+      return;
+    }
+    if (!thumbnailUrl) {
+      alert('썸네일 이미지를 업로드하세요.');
+      return;
+    }
+    const latitude = placedMarker.lat;
+    const longitude = placedMarker.lng;
+    const thumbnailImage = thumbnailUrl;
+    const selectedImages = detailUrls;
+    const markerData = {
+      latitude: latitude,
+      longitude: longitude,
+      emotion_tag: emotionTags.join(','), // 문자열로 전송
+      description: description.trim(),
+      thumbnail_img: thumbnailImage.replace('https://bigpicture-jun-dev.s3.ap-northeast-2.amazonaws.com', ''),
+      images: [
+        {
+          image_url: thumbnailImage.replace('https://bigpicture-jun-dev.s3.ap-northeast-2.amazonaws.com', ''),
+          image_type: 'thumbnail',
+          image_order: 0,
+          is_primary: true
+        },
+        ...selectedImages.map((imageUrl, index) => ({
+          image_url: imageUrl.replace('https://bigpicture-jun-dev.s3.ap-northeast-2.amazonaws.com', ''),
+          image_type: 'detail',
+          image_order: index + 1,
+          is_primary: false
+        }))
+      ]
+    };
+    console.log('서버로 보낼 마커 데이터:', markerData);
+    try {
+      const response = await apiClient.post('/markers', markerData);
+      alert('마커가 저장되었습니다!');
+      setShowPlaceModal(false);
+      setPlacedMarker(null);
+      setDescription('');
+      setEmotionTags([]);
+      setThumbnailFile(null);
+      setThumbnailPreview(null);
+      setThumbnailUrl(null);
+      setDetailFiles([]);
+      setDetailPreviews([]);
+      setDetailUrls([]);
+      // 마커 저장 후 마커 목록 갱신
+      if (mapRef.current) {
+        const bounds = mapRef.current.getBounds();
+        if (bounds) {
+          fetchMarkers(bounds);
+        }
+      }
+    } catch (err) {
+      alert('마커 저장 실패');
+    }
+  };
+
+  // 썸네일 업로드 핸들러 (API 연동)
+  const handleThumbnailChange = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    setThumbnailFile(file);
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (ev) => setThumbnailPreview(ev.target?.result as string);
+      reader.readAsDataURL(file);
+      
+      setIsThumbnailUploading(true);
+      const formData = new FormData();
+      formData.append('image', file);
+      
+      try {
+        const res = await apiClient.post('/s3/upload/circular', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+        const fullS3Url = `https://bigpicture-jun-dev.s3.ap-northeast-2.amazonaws.com${res.data.s3_url}`;
+        setThumbnailUrl(fullS3Url);
+      } catch (err) {
+        alert('썸네일 업로드 실패');
+        setThumbnailUrl(null);
+      } finally {
+        setIsThumbnailUploading(false);
+      }
+    } else {
+      setThumbnailPreview(null);
+      setThumbnailUrl(null);
+    }
+  };
+
+  const handleDetailChange = async (e: ChangeEvent<HTMLInputElement>) => {
+    const newFiles = Array.from(e.target.files || []);
+    
+    // 새 파일이 없으면 (취소한 경우) 기존 파일들 유지
+    if (newFiles.length === 0) {
+      return;
+    }
+    
+    // 기존 파일들과 새 파일들을 합침
+    const allFiles = [...detailFiles, ...newFiles];
+    setDetailFiles(allFiles);
+    
+    // 기존 미리보기와 새 미리보기를 합침
+    const newPreviews = await Promise.all(newFiles.map(file => {
+      return new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => resolve(ev.target?.result as string);
+        reader.readAsDataURL(file);
+      });
+    }));
+    setDetailPreviews([...detailPreviews, ...newPreviews]);
+    
+    // 새 파일들만 업로드
+    setIsDetailUploading(true);
+    try {
+      const uploadPromises = newFiles.map(async (file) => {
+        const formData = new FormData();
+        formData.append('image', file);
+        const res = await apiClient.post('/s3/upload/normal', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+        const fullS3Url = `https://bigpicture-jun-dev.s3.ap-northeast-2.amazonaws.com${res.data.s3_url}`;
+        return fullS3Url;
+      });
+      const newUrls = await Promise.all(uploadPromises);
+      setDetailUrls([...detailUrls, ...newUrls]);
+    } catch (err) {
+      alert('상세 이미지 업로드 실패');
+      // 실패한 경우 새로 추가된 파일들만 제거
+      setDetailFiles(detailFiles);
+      setDetailPreviews(detailPreviews);
+    } finally {
+      setIsDetailUploading(false);
+    }
+  };
 
   const fetchMarkers = useCallback(async (bounds: google.maps.LatLngBounds) => {
     if (fetchTimeoutRef.current) {
@@ -388,14 +571,42 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
     }
   };
 
-  // 지도 클릭 핸들러
-  const handleMapClick = (e: google.maps.MapMouseEvent) => {
-    if (isPlacingMarker && e.latLng) {
-      setPlacedMarker({ lat: e.latLng.lat(), lng: e.latLng.lng() });
-      setShowPlaceInfoWindow(true);
-      setIsPlacingMarker(false);
+  // 내 위치로 실시간 이동 함수
+  const handleMyLocation = () => {
+    setHasCentered(false); // 버튼 누를 때마다 초기화
+    if (!navigator.geolocation) {
+      alert('이 브라우저에서는 위치 정보가 지원되지 않습니다.');
+      return;
     }
+    // 기존 watch 구독 해제
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+    }
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        setMyLocation({ lat: latitude, lng: longitude });
+        if (!hasCentered && mapRef.current) {
+          mapRef.current.setCenter({ lat: latitude, lng: longitude });
+          mapRef.current.setZoom(16);
+          setHasCentered(true);
+        }
+      },
+      (error) => {
+        alert('위치 정보를 가져오지 못했습니다. 위치 권한을 허용해주세요.');
+      },
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
+    );
   };
+
+  // 언마운트 시 watch 구독 해제
+  useEffect(() => {
+    return () => {
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+      }
+    };
+  }, []);
 
   // 플러스 버튼 클릭 핸들러
   const handlePlusClick = () => {
@@ -403,12 +614,42 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
     setPlacedMarker(null);
     setShowPlaceModal(false);
     setShowPlaceInfoWindow(false);
+    // 지도 커서를 십자 모양으로 변경
+    if (mapRef.current) {
+      mapRef.current.setOptions({ draggableCursor: 'crosshair' });
+    }
+  };
+
+  // 지도 클릭 핸들러
+  const handleMapClick = (e: google.maps.MapMouseEvent) => {
+    if (isPlacingMarker && e.latLng) {
+      setPlacedMarker({ lat: e.latLng.lat(), lng: e.latLng.lng() });
+      setShowPlaceInfoWindow(true);
+      setIsPlacingMarker(false);
+      // 지도 커서를 기본으로 복원
+      if (mapRef.current) {
+        mapRef.current.setOptions({ draggableCursor: 'grab' });
+      }
+    }
   };
 
   // 클러스터 마커 렌더러
   // MarkerClustererRenderer import 및 관련 함수 완전히 제거
 
   console.log('렌더링할 마커 개수:', markers.length, '현재 줌:', currentZoom);
+
+  // InfoWindow에서 이미지 클릭 시 뷰어 오픈
+  const handleMarkerImageClick = (marker: MarkerData) => {
+    const images: string[] = [];
+    if (marker.thumbnailImg) images.push(getFullImageUrl(marker.thumbnailImg) ?? '');
+    // 상세이미지(추가 구현 필요: marker.detailImages 등)
+    if ((marker as any).detailImages && Array.isArray((marker as any).detailImages)) {
+      (marker as any).detailImages.forEach((img: string) => images.push(getFullImageUrl(img) ?? ''));
+    }
+    setImageViewerImages(images.filter(Boolean));
+    setImageViewerIndex(0);
+    setImageViewerOpen(true);
+  };
 
   return (
     <LoadScript 
@@ -430,10 +671,21 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
         >
           +
         </button>
-        {/* 지도 하단 확대/축소 버튼 */}
-        <div className="absolute bottom-24 right-4 z-20 flex flex-col gap-2">
+        {/* 지도 하단 확대/축소/내위치 버튼 */}
+        <div className="absolute bottom-32 right-4 z-30 flex flex-col gap-2 items-center">
           <button onClick={handleZoomIn} className="w-12 h-12 rounded-full bg-white border shadow flex items-center justify-center text-2xl font-bold text-black hover:bg-gray-100">+</button>
           <button onClick={handleZoomOut} className="w-12 h-12 rounded-full bg-white border shadow flex items-center justify-center text-2xl font-bold text-black hover:bg-gray-100">-</button>
+          <button
+            onClick={handleMyLocation}
+            className="w-12 h-12 rounded-full bg-white border shadow flex items-center justify-center text-xl font-bold text-blue-600 hover:bg-blue-100"
+            title="내 위치로 이동"
+          >
+            {/* SVG 아이콘만 표시 */}
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <circle cx="12" cy="12" r="4" fill="#2563eb" />
+              <path stroke="#2563eb" strokeWidth="2" d="M12 2v2m0 16v2m10-10h-2M4 12H2m15.07-7.07l-1.41 1.41M6.34 17.66l-1.41 1.41m12.02 0l-1.41-1.41M6.34 6.34L4.93 4.93" />
+            </svg>
+          </button>
         </div>
         {/* 검색창 */}
         <div className="absolute top-20 left-4 right-4 z-10">
@@ -499,6 +751,16 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
           onBoundsChanged={onBoundsChanged}
           onZoomChanged={onZoomChanged}
           onClick={handleMapClick}
+          options={{
+            disableDefaultUI: true,
+            zoomControl: false,
+            mapTypeControl: false,
+            streetViewControl: false,
+            fullscreenControl: false,
+            scaleControl: false,
+            rotateControl: false,
+            clickableIcons: false,
+          }}
         >
           {loading && (
             <div className="absolute top-2 left-2 bg-white px-3 py-1 rounded shadow text-sm">
@@ -581,7 +843,8 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                 <img 
                   src={getFullImageUrl(selectedMarker.thumbnailImg)}
                   alt="썸네일"
-                  className="w-12 h-12 rounded-full object-cover"
+                  className="w-12 h-12 rounded-full object-cover cursor-pointer border-2 border-blue-400 hover:scale-105 transition"
+                  onClick={() => handleMarkerImageClick(selectedMarker)}
                 />
                 <div>
                   <div className="font-semibold text-sm">{selectedMarker.author}</div>
@@ -597,21 +860,165 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
             </div>
           </InfoWindow>
         )}
+        {/* 내 위치 파란 점 마커 */}
+        {myLocation && (
+          <Marker
+            position={myLocation}
+            icon={{
+              path: window.google?.maps?.SymbolPath.CIRCLE,
+              scale: 10,
+              fillColor: '#2563eb',
+              fillOpacity: 1,
+              strokeColor: '#fff',
+              strokeWeight: 2,
+            }}
+            zIndex={9999}
+          />
+        )}
       </GoogleMap>
       {/* 좌표 입력 모달 */}
       {showPlaceModal && placedMarker && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md relative text-black">
-            <button className="absolute top-2 right-2 text-gray-400 hover:text-gray-700 text-2xl" onClick={() => { setShowPlaceModal(false); setPlacedMarker(null); }}>&times;</button>
-            <h2 className="text-lg font-bold mb-4">좌표에 데이터 입력</h2>
-            <div className="mb-2 text-sm">위도: <span className="font-mono">{placedMarker.lat}</span></div>
-            <div className="mb-4 text-sm">경도: <span className="font-mono">{placedMarker.lng}</span></div>
-            <form className="flex flex-col gap-3">
-              <input className="border rounded px-3 py-2" placeholder="제목" />
-              <textarea className="border rounded px-3 py-2" placeholder="설명" rows={3} />
-              <input className="border rounded px-3 py-2" placeholder="감성태그 (예: 😊)" />
-              <button type="button" className="mt-2 bg-blue-600 text-white rounded px-4 py-2 font-semibold hover:bg-blue-700">저장</button>
-            </form>
+          <div className="bg-white rounded-2xl shadow-2xl p-0 w-full max-w-md relative text-black overflow-hidden max-h-[90vh] flex flex-col">
+            {/* 썸네일 미리보기 영역 */}
+            <div className="w-full h-48 bg-gray-100 flex items-center justify-center">
+              {thumbnailPreview ? (
+                <img src={thumbnailPreview} alt="썸네일 미리보기" className="object-cover w-full h-full" style={{ borderTopLeftRadius: '1rem', borderTopRightRadius: '1rem' }} />
+              ) : (
+                <span className="text-gray-400">썸네일 미리보기</span>
+              )}
+            </div>
+            
+            {/* 폼 내용 영역 (스크롤 가능) */}
+            <div className="flex-1 overflow-y-auto p-6">
+              <h2 className="text-xl font-bold mb-4">좌표에 데이터 입력</h2>
+              <div className="mb-2 text-sm text-gray-500">위도: <span className="font-mono text-blue-700 font-semibold">{placedMarker.lat}</span></div>
+              <div className="mb-4 text-sm text-gray-500">경도: <span className="font-mono text-blue-700 font-semibold">{placedMarker.lng}</span></div>
+
+              {/* 설명 입력 */}
+              <textarea
+                className="w-full mb-4 border rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition text-black"
+                placeholder="설명"
+                rows={3}
+                value={description}
+                onChange={e => setDescription(e.target.value)}
+              />
+
+              {/* 감성태그 입력 */}
+              <div className="mb-4">
+                <div className="flex gap-2 flex-wrap mb-2">
+                  {emotionTags.map(tag => (
+                    <span key={tag} className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm mr-2 mb-2">
+                      {tag}
+                      <button type="button" className="ml-2 text-blue-400 hover:text-blue-700" onClick={() => handleRemoveEmotionTag(tag)}>&times;</button>
+                    </span>
+                  ))}
+                </div>
+                <input
+                  className="w-full border rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition text-black"
+                  placeholder="감성태그 입력 후 엔터 (예: 재미, 흥미, 열정)"
+                  value={emotionInput}
+                  onChange={handleEmotionInputChange}
+                  onKeyDown={handleEmotionInputKeyDown}
+                />
+              </div>
+              
+              {/* 썸네일 이미지 업로드 */}
+              <label className="block mb-4">
+                <span className="block text-sm font-medium text-gray-700 mb-1">썸네일 이미지 (1장)</span>
+                <input type="file" accept="image/*" onChange={handleThumbnailChange} className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
+                {thumbnailUrl && (
+                  <div className="text-xs text-green-600 mt-1">업로드 완료</div>
+                )}
+                {isThumbnailUploading && (
+                  <div className="text-xs text-blue-600 mt-1">업로딩 중...</div>
+                )}
+              </label>
+              
+              {/* 상세 이미지 업로드 */}
+              <label className="block mb-4">
+                <span className="block text-sm font-medium text-gray-700 mb-1">상세 이미지 (여러 장)</span>
+                <input type="file" accept="image/*" multiple onChange={handleDetailChange} className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
+                {detailUrls.length > 0 && (
+                  <div className="text-xs text-green-600 mt-1">{detailUrls.length}장 업로드 완료</div>
+                )}
+                {isDetailUploading && (
+                  <div className="text-xs text-blue-600 mt-1">업로딩 중...</div>
+                )}
+              </label>
+              
+              {/* 상세 이미지 미리보기 */}
+              {detailPreviews.length > 0 && (
+                <div className="mb-4">
+                  <span className="block text-sm font-medium text-gray-700 mb-2">상세 이미지 미리보기</span>
+                  <div className="flex gap-2 flex-wrap">
+                    {detailPreviews.map((src, idx) => (
+                      <img key={idx} src={src} alt={`상세이미지${idx+1}`} className="w-16 h-16 object-cover rounded-lg border" />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            {/* 버튼 영역 (고정) */}
+            <div className="p-6 border-t bg-white">
+              <div className="flex gap-3">
+                <button
+                  onClick={() => { setShowPlaceModal(false); setPlacedMarker(null); }}
+                  className="flex-1 px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  취소
+                </button>
+                <button
+                  onClick={handleSaveMarker}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  저장
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* 이미지 뷰어 모달 */}
+      {imageViewerOpen && (
+        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/70">
+          <div className="relative bg-white rounded-2xl shadow-2xl max-w-lg w-full p-0 flex flex-col">
+            <button className="absolute top-2 right-2 text-3xl text-gray-400 hover:text-gray-700 z-10" onClick={() => setImageViewerOpen(false)}>&times;</button>
+            <div className="flex-1 flex flex-col items-center justify-center p-6">
+              {imageViewerImages.length > 0 && (
+                <img
+                  src={imageViewerImages[imageViewerIndex]}
+                  alt={`미리보기${imageViewerIndex+1}`}
+                  className="max-h-[60vh] max-w-full rounded-xl object-contain shadow-lg border mb-4"
+                />
+              )}
+              {/* 썸네일/상세 이미지 썸네일 리스트 */}
+              <div className="flex gap-2 mt-2 flex-wrap justify-center">
+                {imageViewerImages.map((img, idx) => (
+                  <img
+                    key={idx}
+                    src={img}
+                    alt={`썸네일${idx+1}`}
+                    className={`w-16 h-16 object-cover rounded-lg border cursor-pointer ${imageViewerIndex===idx ? 'ring-2 ring-blue-500' : ''}`}
+                    onClick={() => setImageViewerIndex(idx)}
+                  />
+                ))}
+              </div>
+              {/* 좌우 이동 버튼 */}
+              {imageViewerImages.length > 1 && (
+                <div className="flex gap-4 mt-4 justify-center">
+                  <button
+                    className="px-4 py-2 bg-gray-200 rounded-full text-lg font-bold hover:bg-gray-300"
+                    onClick={() => setImageViewerIndex((prev) => prev === 0 ? imageViewerImages.length-1 : prev-1)}
+                  >&lt;</button>
+                  <button
+                    className="px-4 py-2 bg-gray-200 rounded-full text-lg font-bold hover:bg-gray-300"
+                    onClick={() => setImageViewerIndex((prev) => prev === imageViewerImages.length-1 ? 0 : prev+1)}
+                  >&gt;</button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
