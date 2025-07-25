@@ -87,6 +87,9 @@ export default function GoogleMapClient() {
   const [isClusterLoading, setIsClusterLoading] = useState(false);
   const clusterDebounceRef = useRef<NodeJS.Timeout | null>(null);
   const [showMyMarkers, setShowMyMarkers] = useState(false);
+  // 상세 모달 관련 state 추가
+  const [multiMarkers, setMultiMarkers] = useState<MarkerData[]>([]);
+  const [multiMarkerIndex, setMultiMarkerIndex] = useState(0);
 
   // 감성태그 입력 핸들러
   const handleEmotionInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -698,16 +701,15 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
           <button className="text-sm font-medium text-gray-600 px-3 py-1 rounded-full hover:bg-gray-100">감정</button>
           <button className="text-sm font-medium text-gray-600 px-3 py-1 rounded-full hover:bg-gray-100">카테고리</button>
         </div>
-        {/* 지도 오른쪽 위 플러스 버튼 */}
-        <button
-          className={`absolute top-4 right-20 z-20 w-12 h-12 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-lg hover:bg-blue-700 text-3xl ${isPlacingMarker ? 'ring-4 ring-blue-200' : ''}`}
-          title="추가"
-          onClick={handlePlusClick}
-        >
-          +
-        </button>
         {/* 지도 하단 확대/축소/내위치 버튼 */}
         <div className="absolute bottom-32 right-4 z-30 flex flex-col gap-2 items-center">
+        <button
+            className={`w-12 h-12 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-lg hover:bg-blue-700 text-3xl ${isPlacingMarker ? 'ring-4 ring-blue-200' : ''}`}
+            title="추가"
+            onClick={handlePlusClick}
+          >
+            +
+          </button>
           <button onClick={handleZoomIn} className="w-12 h-12 rounded-full bg-white border shadow flex items-center justify-center text-2xl font-bold text-black hover:bg-gray-100">+</button>
           <button onClick={handleZoomOut} className="w-12 h-12 rounded-full bg-white border shadow flex items-center justify-center text-2xl font-bold text-black hover:bg-gray-100">-</button>
           <button
@@ -722,8 +724,15 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
             </svg>
           </button>
         </div>
-        {/* 지도 상단 우측에 토글 버튼 추가 */}
+        {/* 지도 상단 우측에 플러스(마커 생성) 버튼 + 내마커만보기 토글 */}
         <div className="absolute top-4 right-4 z-50 flex gap-2">
+          {/* <button
+            className={`w-12 h-12 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-lg hover:bg-blue-700 text-3xl ${isPlacingMarker ? 'ring-4 ring-blue-200' : ''}`}
+            title="추가"
+            onClick={handlePlusClick}
+          >
+            +
+          </button> */}
           <button
             className={`px-3 py-1 rounded-full shadow text-sm font-semibold border transition-colors duration-150 ${showMyMarkers ? 'bg-blue-500 text-white border-blue-500' : 'bg-white text-blue-500 border-blue-300 hover:bg-blue-50'}`}
             onClick={() => {
@@ -832,7 +841,30 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
           {(clusterer) => (
             <>
               {clusters.map((cluster) => {
-                if (cluster.count === 1 && cluster.markers && cluster.markers.length > 0) {
+                if (cluster.count === 1 && cluster.markers && cluster.markers.length > 1) {
+                  // 동일 위치에 여러 마커가 겹친 경우
+                  const markerGroup = cluster.markers;
+                  const mainMarker = markerGroup[0];
+                  const icon = createCustomMarkerIcon(mainMarker.thumbnailImg);
+                  return (
+                    <Marker
+                      key={cluster.h3_index}
+                      position={{ lat: mainMarker.latitude, lng: mainMarker.longitude }}
+                      icon={icon}
+                      label={{
+                        text: `+${markerGroup.length - 1}`,
+                        color: 'white',
+                        fontSize: '16px',
+                        fontWeight: 'bold',
+                      }}
+                      onClick={() => {
+                        setSelectedMarker(mainMarker);
+                        setMultiMarkers(markerGroup); // 새 state: 현재 그룹 markers 배열
+                        setMultiMarkerIndex(0); // 새 state: 현재 인덱스
+                      }}
+                    />
+                  );
+                } else if (cluster.count === 1 && cluster.markers && cluster.markers.length === 1) {
                   const marker = cluster.markers[0];
                   const icon = createCustomMarkerIcon(marker.thumbnailImg);
                   return (
@@ -1159,6 +1191,86 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                 <span className="flex items-center gap-1"><svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 15a7 7 0 0014 0M12 10v4m0 0h4m-4 0H8" /></svg> {detailModalMarker.likes}</span>
                 <span className="flex items-center gap-1"><svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg> {detailModalMarker.views}</span>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {multiMarkers.length > 1 && detailModalOpen && (
+        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/70">
+          <div className="relative bg-white rounded-3xl shadow-2xl max-w-lg w-full flex flex-col overflow-hidden border border-blue-100">
+            <button className="absolute top-4 right-4 text-3xl text-blue-400 hover:text-blue-700 z-10 bg-white rounded-full shadow p-2 transition" onClick={() => setDetailModalOpen(false)}>&times;</button>
+            {/* 이미지 섹션 */}
+            <div className="bg-gradient-to-b from-blue-50 to-white p-6">
+              {/* 썸네일 이미지 */}
+              {detailModalImages.length > 0 && (
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold text-blue-700 mb-3 text-center">썸네일</h3>
+                  <div className="flex justify-center">
+                    <img
+                      src={detailModalImages[0]}
+                      alt="썸네일"
+                      className="max-h-64 max-w-full rounded-2xl object-contain shadow-lg border-2 border-blue-100"
+                    />
+                  </div>
+                </div>
+              )}
+              
+              {/* 상세 이미지 그리드 */}
+              {detailModalImages.length > 1 && (
+                <div>
+                  <h3 className="text-lg font-semibold text-blue-700 mb-3 text-center">상세 이미지</h3>
+                  <div className="grid grid-cols-3 gap-3">
+                    {detailModalImages.slice(1, 4).map((img, idx) => (
+                      <div key={idx} className="aspect-square">
+                        <img
+                          src={img}
+                          alt={`상세이미지${idx+1}`}
+                          className="w-full h-full object-cover rounded-xl shadow-md border border-gray-200"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            {/* 정보 카드 */}
+            <div className="p-6 flex flex-col gap-3 border-t border-blue-100 bg-white">
+              <div className="flex items-center gap-3 mb-2">
+                <span className="font-semibold text-lg text-blue-700 flex items-center gap-1">
+                  <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                  {multiMarkers[multiMarkerIndex].author}
+                </span>
+                <span className="text-xs text-gray-400 flex items-center gap-1">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                  {new Date(multiMarkers[multiMarkerIndex].createdAt).toLocaleDateString()}
+                </span>
+              </div>
+              <div className="flex gap-2 flex-wrap mb-2">
+                {/* 감성태그 chip */}
+                {multiMarkers[multiMarkerIndex].emotionTag && multiMarkers[multiMarkerIndex].emotionTag.split(',').map((tag, idx) => (
+                  <span key={idx} className="inline-flex items-center px-3 py-1 bg-gradient-to-r from-pink-200 via-blue-100 to-yellow-100 text-blue-700 rounded-full text-sm font-semibold shadow-sm border border-blue-200 mr-2 mb-2">#{tag}</span>
+                ))}
+              </div>
+              <div className="text-lg text-gray-800 mb-2 whitespace-pre-line font-medium leading-relaxed">
+                {multiMarkers[multiMarkerIndex].description}
+              </div>
+              <div className="flex gap-6 text-gray-500 text-base mt-2 border-t border-blue-50 pt-3">
+                <span className="flex items-center gap-1"><svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 15a7 7 0 0014 0M12 10v4m0 0h4m-4 0H8" /></svg> {multiMarkers[multiMarkerIndex].likes}</span>
+                <span className="flex items-center gap-1"><svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg> {multiMarkers[multiMarkerIndex].views}</span>
+              </div>
+            </div>
+            <div className="flex justify-between items-center mt-4">
+              <button
+                disabled={multiMarkerIndex === 0}
+                onClick={() => setMultiMarkerIndex(i => Math.max(0, i - 1))}
+                className="px-3 py-1 rounded bg-gray-100 text-gray-700 disabled:opacity-50"
+              >이전</button>
+              <span className="text-sm text-gray-500">{multiMarkerIndex + 1} / {multiMarkers.length}</span>
+              <button
+                disabled={multiMarkerIndex === multiMarkers.length - 1}
+                onClick={() => setMultiMarkerIndex(i => Math.min(multiMarkers.length - 1, i + 1))}
+                className="px-3 py-1 rounded bg-gray-100 text-gray-700 disabled:opacity-50"
+              >다음</button>
             </div>
           </div>
         </div>
