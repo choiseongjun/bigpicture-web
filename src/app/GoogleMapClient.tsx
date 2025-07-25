@@ -169,6 +169,7 @@ export default function GoogleMapClient() {
           fetchMarkers(bounds);
         }
       }
+      setIsPlacingMarker(false);
     } catch (err) {
       alert('마커 저장 실패');
     }
@@ -650,7 +651,14 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
     setPlacedMarker(null);
     setShowPlaceModal(false);
     setShowPlaceInfoWindow(false);
-    // 지도 커서를 십자 모양으로 변경
+    setDescription('');
+    setEmotionTags([]);
+    setThumbnailFile(null);
+    setThumbnailPreview(null);
+    setThumbnailUrl(null);
+    setDetailFiles([]);
+    setDetailPreviews([]);
+    setDetailUrls([]);
     if (mapRef.current) {
       mapRef.current.setOptions({ draggableCursor: 'crosshair' });
     }
@@ -840,29 +848,50 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
         <MarkerClusterer options={getClustererOptions()}>
           {(clusterer) => (
             <>
-              {clusters.map((cluster) => {
+              {!isPlacingMarker && clusters.map((cluster) => {
                 if (cluster.count === 1 && cluster.markers && cluster.markers.length > 1) {
                   // 동일 위치에 여러 마커가 겹친 경우
                   const markerGroup = cluster.markers;
                   const mainMarker = markerGroup[0];
                   const icon = createCustomMarkerIcon(mainMarker.thumbnailImg);
                   return (
-                    <Marker
-                      key={cluster.h3_index}
-                      position={{ lat: mainMarker.latitude, lng: mainMarker.longitude }}
-                      icon={icon}
-                      label={{
-                        text: `+${markerGroup.length - 1}`,
-                        color: 'white',
-                        fontSize: '16px',
-                        fontWeight: 'bold',
-                      }}
-                      onClick={() => {
-                        setSelectedMarker(mainMarker);
-                        setMultiMarkers(markerGroup); // 새 state: 현재 그룹 markers 배열
-                        setMultiMarkerIndex(0); // 새 state: 현재 인덱스
-                      }}
-                    />
+                    <>
+                      <Marker
+                        key={cluster.h3_index}
+                        position={{ lat: mainMarker.latitude, lng: mainMarker.longitude }}
+                        icon={icon}
+                        onClick={() => {
+                          setSelectedMarker(mainMarker);
+                          setMultiMarkers(markerGroup);
+                          setMultiMarkerIndex(0);
+                        }}
+                        options={{ clickable: true, cursor: 'pointer' }}
+                      />
+                      <OverlayView
+                        position={{ lat: mainMarker.latitude, lng: mainMarker.longitude }}
+                        mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+                      >
+                        <div style={{ position: 'relative', width: 0, height: 0 }}>
+                          <div style={{
+                            position: 'absolute',
+                            top: '-32px',
+                            right: '-16px',
+                            background: 'linear-gradient(90deg, #2563eb 60%, #60a5fa 100%)',
+                            color: 'white',
+                            borderRadius: '9999px',
+                            padding: '2px 8px',
+                            fontSize: '14px',
+                            fontWeight: 700,
+                            boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                            border: '2px solid white',
+                            zIndex: 10,
+                            pointerEvents: 'none',
+                          }}>
+                            +{markerGroup.length - 1}
+                          </div>
+                        </div>
+                      </OverlayView>
+                    </>
                   );
                 } else if (cluster.count === 1 && cluster.markers && cluster.markers.length === 1) {
                   const marker = cluster.markers[0];
@@ -873,6 +902,7 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                       position={{ lat: marker.latitude, lng: marker.longitude }}
                       icon={icon}
                       onClick={() => setSelectedMarker(marker)}
+                      options={{ clickable: true, cursor: 'pointer' }}
                     />
                   );
                 } else {
@@ -901,12 +931,13 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                           mapRef.current.panTo({ lat: cluster.lat, lng: cluster.lng });
                         }
                       }}
+                      options={{ clickable: true, cursor: 'pointer' }}
                     />
                   );
                 }
               })}
 
-              {markers.map((marker, index) => {
+              {!isPlacingMarker && markers.map((marker, index) => {
                 const icon = createCustomMarkerIcon(marker.thumbnailImg);
                 return (
                   <Marker
@@ -941,6 +972,7 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                 onCloseClick={() => {
                   setPlacedMarker(null);
                   setShowPlaceInfoWindow(false);
+                  setIsPlacingMarker(false);
                 }}
               >
                 <div className="flex flex-col gap-2 text-black">
@@ -958,6 +990,7 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                       onClick={() => {
                         setPlacedMarker(null);
                         setShowPlaceInfoWindow(false);
+                        setIsPlacingMarker(false);
                       }}
                     >취소</button>
                   </div>
@@ -1111,7 +1144,7 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
             <div className="p-6 border-t bg-white">
               <div className="flex gap-3">
                 <button
-                  onClick={() => { setShowPlaceModal(false); setPlacedMarker(null); }}
+                  onClick={() => { setShowPlaceModal(false); setPlacedMarker(null); setIsPlacingMarker(false); }}
                   className="flex-1 px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
                 >
                   취소
