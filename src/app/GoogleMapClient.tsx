@@ -2,6 +2,7 @@
 
 import { GoogleMap, LoadScript, Marker, InfoWindow, MarkerClusterer } from '@react-google-maps/api';
 import { useState, useEffect, useRef, useCallback } from 'react';
+import apiClient from './lib/apiClient';
 
 const containerStyle = {
   width: '100%',
@@ -62,11 +63,8 @@ export default function GoogleMapClient() {
         const lat_delta = Math.abs(ne.lat() - sw.lat()) / 2;
         const lng_delta = Math.abs(ne.lng() - sw.lng()) / 2;
 
-        const url = `http://localhost:5500/api/markers?lat=${lat}&lng=${lng}&lat_delta=${lat_delta}&lng_delta=${lng_delta}&limit=150`;
-        console.log('API URL:', url);
-        
-        const response = await fetch(url);
-        const data = await response.json();
+        const response = await apiClient.get(`/markers?lat=${lat}&lng=${lng}&lat_delta=${lat_delta}&lng_delta=${lng_delta}&limit=200`);
+        const data = response.data;
         console.log('API 응답:', data);
         console.log('마커 개수:', data.data?.length || 0);
         
@@ -244,8 +242,66 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
     markerRefs.current.push(marker);
   };
 
+  const handleSearchResultClick = useCallback((place: google.maps.places.PlaceResult) => {
+    console.log('=== 검색 결과 클릭 시작 ===');
+    console.log('클릭된 장소:', place);
+    console.log('지도 참조 존재:', !!mapRef.current);
+    console.log('위치 정보 존재:', !!place.geometry?.location);
+    console.log('Google Maps API 키 존재:', !!process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY);
+    console.log('Google Maps API 키 길이:', process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.length);
+    console.log('Google Maps API 로드 상태:', !!window.google?.maps);
+    console.log('Google Maps Places API 로드 상태:', !!window.google?.maps?.places);
+    
+    if (!mapRef.current) {
+      console.error('지도가 로드되지 않음');
+      return;
+    }
+    
+    if (!place.geometry?.location) {
+      console.error('위치 정보가 없음');
+      return;
+    }
+    
+    let location = place.geometry.location;
+    let lat: number, lng: number;
+    if (typeof location.lat === 'function' && typeof location.lng === 'function') {
+      lat = location.lat();
+      lng = location.lng();
+    } else {
+      lat = (location as any).lat;
+      lng = (location as any).lng;
+    }
+    const latLng = new window.google.maps.LatLng(lat, lng);
+
+    
+    try {
+      // 지도 이동 - setCenter만 사용
+
+      mapRef.current.setCenter(latLng);
+
+      mapRef.current.setZoom(15);
+   
+      // 검색 결과 숨기기 및 검색창 업데이트
+      setShowSearchResults(false);
+      setSearchQuery(place.name || '');
+      console.log('=== 지도 이동 완료 ===');
+    } catch (error) {
+      console.error('지도 이동 중 오류:', error);
+      console.error('오류 상세:', {
+        name: (error as Error).name,
+        message: (error as Error).message,
+        stack: (error as Error).stack
+      });
+    }
+  }, []);
+
   // 검색 기능
   const handleSearch = useCallback(async () => {
+    console.log('=== 검색 버튼 클릭됨 ===');
+    console.log('검색어:', searchQuery);
+    console.log('검색어 길이:', searchQuery.length);
+    console.log('검색어 공백 제거 후 길이:', searchQuery.trim().length);
+    
     if (!searchQuery.trim()) {
       console.log('검색어가 비어있음');
       return;
@@ -275,6 +331,11 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
           setSearchResults(results);
           setShowSearchResults(true);
           console.log('검색 결과 설정 완료:', results.length);
+
+          // 첫 번째 결과로 지도 이동
+          if (results.length > 0) {
+            handleSearchResultClick(results[0]);
+          }
         } else {
           console.log('검색 결과 없음:', status);
           setSearchResults([]);
@@ -284,57 +345,7 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
     } catch (error) {
       console.error('검색 중 오류 발생:', error);
     }
-  }, [searchQuery]);
-
-  const handleSearchResultClick = useCallback((place: google.maps.places.PlaceResult) => {
-    console.log('=== 검색 결과 클릭 시작 ===');
-    console.log('클릭된 장소:', place);
-    console.log('지도 참조 존재:', !!mapRef.current);
-    console.log('위치 정보 존재:', !!place.geometry?.location);
-    
-    if (!mapRef.current) {
-      console.error('지도가 로드되지 않음');
-      return;
-    }
-    
-    if (!place.geometry?.location) {
-      console.error('위치 정보가 없음');
-      return;
-    }
-    
-    const location = place.geometry.location;
-    const lat = location.lat();
-    const lng = location.lng();
-    
-    console.log('이동할 위치:', { lat, lng });
-    console.log('현재 지도 중심:', mapRef.current.getCenter());
-    console.log('현재 줌 레벨:', mapRef.current.getZoom());
-    
-    try {
-      // 지도 이동 - 여러 방법 시도
-      console.log('지도 이동 시작...');
-      
-      // 방법 1: setCenter 사용
-      mapRef.current.setCenter(location);
-      console.log('setCenter 완료');
-      
-      // 방법 2: panTo 사용
-      mapRef.current.panTo(location);
-      console.log('panTo 완료');
-      
-      // 줌 조정
-      mapRef.current.setZoom(15);
-      console.log('setZoom 완료');
-      
-      // 검색 결과 숨기기 및 검색창 업데이트
-      setShowSearchResults(false);
-      setSearchQuery(place.name || '');
-      
-      console.log('=== 지도 이동 완료 ===');
-    } catch (error) {
-      console.error('지도 이동 중 오류:', error);
-    }
-  }, []);
+  }, [searchQuery, handleSearchResultClick]);
 
   const handleSearchKeyPress = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
@@ -444,7 +455,7 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
             </button>
             
             {/* 테스트 버튼 - 지도 이동 테스트용 */}
-            <button
+            {/* <button
               onClick={() => {
                 if (mapRef.current) {
                   console.log('테스트: 서울로 이동');
@@ -455,7 +466,7 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
               className="absolute right-12 top-1/2 transform -translate-y-1/2 text-blue-500 hover:text-blue-700 text-xs"
             >
               테스트
-            </button>
+            </button> */}
             
             {/* 검색 결과 드롭다운 */}
             {showSearchResults && searchResults.length > 0 && (

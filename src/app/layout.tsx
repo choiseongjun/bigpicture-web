@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import Link from "next/link";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -30,10 +31,10 @@ export default function RootLayout({
         {children}
         {/* 하단 네비게이션 바 tailwind로 재구현 */}
         <nav className="fixed bottom-0 left-0 w-full h-16 bg-white border-t border-gray-200 flex justify-between items-center z-50 px-2">
-          <a href="#" className="flex flex-col items-center flex-1 text-xs text-gray-700 hover:text-blue-600" aria-label="홈">
+          <Link href="/" className="flex flex-col items-center flex-1 text-xs text-gray-700 hover:text-blue-600" aria-label="홈">
             <span className="material-icons mb-0.5">home</span>
             홈
-          </a>
+          </Link>
           <a href="#" className="flex flex-col items-center flex-1 text-xs text-gray-700 hover:text-blue-600" aria-label="랭킹">
             <span className="material-icons mb-0.5">leaderboard</span>
             랭킹
@@ -42,10 +43,10 @@ export default function RootLayout({
             <span className="material-icons mb-0.5">forum</span>
             커뮤니티
           </a>
-          <a href="#" className="flex flex-col items-center flex-1 text-xs text-gray-700 hover:text-blue-600" aria-label="마이페이지">
+          <Link href="/mypage" className="flex flex-col items-center flex-1 text-xs text-gray-700 hover:text-blue-600" aria-label="마이페이지">
             <span className="material-icons mb-0.5">person</span>
             마이페이지
-          </a>
+          </Link>
         </nav>
       </body>
     </html>
