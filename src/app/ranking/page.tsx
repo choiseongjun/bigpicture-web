@@ -220,9 +220,9 @@ export default function RankingPage() {
    };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white py-6 px-2">
+    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white py-6 px-2 pt-[66px]">
       <div className="max-w-2xl mx-auto">
-        <h2 className="text-2xl font-bold mb-6 text-center text-blue-700 tracking-tight">🏆 랭킹</h2>
+        {/* <h2 className="text-2xl font-bold mb-6 text-center text-blue-700 tracking-tight">🏆 랭킹</h2> */}
         {loading && (
           <div className="text-center py-8">
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>

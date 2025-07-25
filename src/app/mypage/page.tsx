@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import apiClient from '../lib/apiClient';
+import { useRouter } from 'next/navigation';
 
 interface LoginForm {
   email: string;
@@ -18,11 +19,13 @@ export default function MyPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const router = useRouter();
+
   // 구글 로그인
   const handleGoogleLogin = async () => {
     setIsLoading(true);
     setError('');
-    
+     
     try {
       // Google OAuth URL로 리다이렉트 (실제 구현에서는 Google OAuth 설정 필요)
       const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(window.location.origin + '/auth/callback')}&response_type=code&scope=email profile`;
@@ -205,6 +208,13 @@ export default function MyPage() {
                 </a>
               </p>
             </div>
+            <button
+              type="button"
+              className="mt-2 w-full py-2 rounded bg-gray-200 text-blue-700 font-semibold hover:bg-blue-100 transition"
+              onClick={() => router.push('/mypage/register')}
+            >
+              회원가입
+            </button>
           </div>
         )}
       </div>

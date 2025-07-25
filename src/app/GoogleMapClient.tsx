@@ -1,6 +1,6 @@
 'use client';
 
-import { GoogleMap, LoadScript, Marker, InfoWindow, MarkerClusterer } from '@react-google-maps/api';
+import { GoogleMap, Marker, InfoWindow, MarkerClusterer } from '@react-google-maps/api';
 import { useState, useEffect, useRef, useCallback, ChangeEvent } from 'react';
 import apiClient from './lib/apiClient';
 
@@ -691,11 +691,7 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
   };
 
   return (
-    <LoadScript 
-      googleMapsApiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!}
-      libraries={['places']}
-    >
-      <div className="w-full h-full absolute inset-0">
+    <div className="w-full h-full absolute inset-0">
         {/* 지도 위 필터 바 */}
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex gap-2 bg-white rounded-full shadow px-4 py-2 border border-gray-200">
           <button className="text-sm font-medium text-blue-600 px-3 py-1 rounded-full bg-blue-50 hover:bg-blue-100">전체</button>
@@ -1168,6 +1164,5 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
         </div>
       )}
       </div>
-    </LoadScript>
   );
 } 
