@@ -6,13 +6,17 @@ export default function Home() {
     <div className="flex flex-col bg-[#f8fafc] mobile-full-height" style={{ height: '100dvh' }}>
       {/* 헤더 */}
       <header className="fixed top-0 left-0 w-full h-14 border-b bg-white shadow-sm z-20 flex items-center justify-between px-4">
-        <div className="w-8" /> {/* 왼쪽 여백 */}
-        <div className="text-xl font-bold tracking-wide select-none">bigpicture</div>
-        <div className="flex items-center gap-2">
-          <button className="w-8 h-8 flex items-center justify-center text-gray-600 hover:text-blue-500">
-            <span className="material-icons">notifications_none</span>
-          </button>
+        <div className="flex items-center gap-4">
+          <h1 className="text-xl font-bold text-gray-900">BigPicture</h1>
+          <Link href="/ranking" className="text-blue-600 hover:text-blue-700 font-medium">
+            🏆 랭킹
+          </Link>
         </div>
+        <Link href="/mypage" title="마이페이지">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+          </svg>
+        </Link>
       </header>
       {/* 필터 바 */}
       <div className="flex items-center gap-2 px-4 py-2 border-b bg-white z-10 mt-14">
