@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import apiClient from '../lib/apiClient';
 
 interface RankingMarker {
   id: number;
@@ -166,42 +167,28 @@ const dummyMarkers: RankingMarker[] = [
 export default function RankingPage() {
   const [markers, setMarkers] = useState<RankingMarker[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [selectedMarker, setSelectedMarker] = useState<RankingMarker | null>(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [detailModalImages, setDetailModalImages] = useState<string[]>([]);
   const [detailModalIndex, setDetailModalIndex] = useState(0);
   const [filter, setFilter] = useState('likes'); // likes, views, recent
 
-  // 가데이터로 랭킹 데이터 가져오기
-  const fetchRanking = useCallback(async (filterType: string = 'likes') => {
-    setLoading(true);
-    
-    // 가데이터 복사 및 정렬
-    let sortedMarkers = [...dummyMarkers];
-    
-    switch (filterType) {
-      case 'likes':
-        sortedMarkers.sort((a, b) => b.likes - a.likes);
-        break;
-      case 'views':
-        sortedMarkers.sort((a, b) => b.views - a.views);
-        break;
-      case 'recent':
-        sortedMarkers.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        break;
-    }
-    
-    // 로딩 시뮬레이션
-    setTimeout(() => {
-      setMarkers(sortedMarkers);
-      setLoading(false);
-    }, 500);
-  }, []);
-
-  // 필터 변경 시 데이터 새로고침
   useEffect(() => {
-    fetchRanking(filter);
-  }, [filter, fetchRanking]);
+    const fetchRanking = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await apiClient.get('/markers/rank?limit=100');
+        setMarkers(response.data.data || []);
+      } catch (e: any) {
+        setError('랭킹 데이터를 불러오지 못했습니다.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchRanking();
+  }, []);
 
   // 상세정보 모달 열기
   const handleMarkerClick = (marker: RankingMarker) => {
@@ -229,99 +216,110 @@ export default function RankingPage() {
     if (url.startsWith('http://') || url.startsWith('https://')) {
       return url;
     }
-    return `https://images.unsplash.com/photo-${url.split('/').pop()}`;
-  };
+    return `https://bigpicture-jun-dev.s3.ap-northeast-2.amazonaws.com${url}`; 
+   };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white py-6 px-2">
       <div className="max-w-2xl mx-auto">
         <h2 className="text-2xl font-bold mb-6 text-center text-blue-700 tracking-tight">🏆 랭킹</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-          {markers.map((marker, idx) => (
-            <div
-              key={marker.id}
-              className="relative bg-white rounded-3xl shadow-lg hover:shadow-2xl transition-shadow duration-200 flex flex-col overflow-hidden group border border-blue-100"
-            >
-              {/* 랭킹 뱃지 */}
-              <div className="absolute -top-3 -left-3 z-10">
-                <div className="bg-gradient-to-r from-yellow-400 to-pink-400 text-white font-bold rounded-full px-4 py-1 shadow text-lg border-2 border-white">
-                  #{idx + 1}
+        {loading && (
+          <div className="text-center py-8">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <p className="mt-2 text-gray-600">로딩 중...</p>
+          </div>
+        )}
+        {error && (
+          <div className="text-center py-8 text-red-500">{error}</div>
+        )}
+        {!loading && !error && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            {markers.map((marker, idx) => (
+              <div
+                key={marker.id}
+                className="relative bg-white rounded-3xl shadow-lg hover:shadow-2xl transition-shadow duration-200 flex flex-col overflow-hidden group border border-blue-100"
+              >
+                {/* 랭킹 뱃지 */}
+                <div className="absolute -top-3 -left-3 z-10">
+                  <div className="bg-gradient-to-r from-yellow-400 to-pink-400 text-white font-bold rounded-full px-4 py-1 shadow text-lg border-2 border-white">
+                    #{idx + 1}
+                  </div>
                 </div>
-              </div>
-              {/* 프로필/작성자 */}
-              <div className="flex items-center gap-2 px-4 pt-4 pb-2">
-                <div className="w-9 h-9 rounded-full bg-blue-200 flex items-center justify-center text-lg font-bold text-white shadow">
-                  {marker.author?.[0] || 'U'}
+                {/* 프로필/작성자 */}
+                <div className="flex items-center gap-2 px-4 pt-4 pb-2">
+                  <div className="w-9 h-9 rounded-full bg-blue-200 flex items-center justify-center text-lg font-bold text-white shadow">
+                    {marker.author?.[0] || 'U'}
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-semibold text-gray-700">{marker.author}</span>
+                    <span className="text-xs text-gray-400">{formatDate(marker.createdAt)}</span>
+                  </div>
                 </div>
-                <div className="flex flex-col">
-                  <span className="text-sm font-semibold text-gray-700">{marker.author}</span>
-                  <span className="text-xs text-gray-400">{formatDate(marker.createdAt)}</span>
+                {/* 썸네일 이미지 */}
+                <div className="w-full aspect-square bg-gray-100 flex items-center justify-center overflow-hidden">
+                  <img
+                    src={getFullImageUrl(marker.thumbnailImg)}
+                    alt="썸네일"
+                    className="object-cover w-full h-full transition-transform duration-200 group-hover:scale-105"
+                    onClick={() => handleMarkerClick(marker)}
+                    style={{ cursor: 'pointer' }}
+                  />
                 </div>
-              </div>
-              {/* 썸네일 이미지 */}
-              <div className="w-full aspect-square bg-gray-100 flex items-center justify-center overflow-hidden">
-                <img
-                  src={getFullImageUrl(marker.thumbnailImg)}
-                  alt="썸네일"
-                  className="object-cover w-full h-full transition-transform duration-200 group-hover:scale-105"
-                  onClick={() => handleMarkerClick(marker)}
-                  style={{ cursor: 'pointer' }}
-                />
-              </div>
-              {/* 상세 이미지 그리드 */}
-              {marker.images && marker.images.length > 0 && (
-                <div className="grid grid-cols-2 gap-1 px-4 pt-2 pb-1">
-                  {marker.images.slice(0, 4).map((img, i) => (
-                    <img
-                      key={img.imageUrl + i}
-                      src={getFullImageUrl(img.imageUrl)}
-                      alt="상세"
-                      className="object-cover w-full h-20 rounded-lg border border-gray-100 shadow-sm hover:scale-105 transition-transform duration-200"
-                      onClick={() => handleMarkerClick(marker)}
-                      style={{ cursor: 'pointer' }}
-                    />
+                {/* 상세 이미지 그리드 */}
+                {marker.images && marker.images.length > 0 && (
+                  <div className="grid grid-cols-2 gap-1 px-4 pt-2 pb-1">
+                    {marker.images.slice(0, 4).map((img, i) => (
+                      <img
+                        key={img.imageUrl + i}
+                        src={getFullImageUrl(img.imageUrl)}
+                        alt="상세"
+                        className="object-cover w-full h-20 rounded-lg border border-gray-100 shadow-sm hover:scale-105 transition-transform duration-200"
+                        onClick={() => handleMarkerClick(marker)}
+                        style={{ cursor: 'pointer' }}
+                      />
+                    ))}
+                  </div>
+                )}
+                {/* 감성태그 칩 */}
+                <div className="flex flex-wrap gap-1 px-4 pt-2">
+                  {(marker.emotionTag || '').split(',').filter(Boolean).map((tag, i) => (
+                    <span
+                      key={tag + i}
+                      className="bg-pink-100 text-pink-600 text-xs font-semibold px-2 py-0.5 rounded-full shadow-sm"
+                    >
+                      {tag.trim()}
+                    </span>
                   ))}
                 </div>
-              )}
-              {/* 감성태그 칩 */}
-              <div className="flex flex-wrap gap-1 px-4 pt-2">
-                {(marker.emotionTag || '').split(',').filter(Boolean).map((tag, i) => (
-                  <span
-                    key={tag + i}
-                    className="bg-pink-100 text-pink-600 text-xs font-semibold px-2 py-0.5 rounded-full shadow-sm"
+                {/* 설명 */}
+                <div className="px-4 pt-2 pb-1">
+                  <div className="text-gray-800 text-sm font-medium line-clamp-2 whitespace-pre-line">
+                    {marker.description}
+                  </div>
+                </div>
+                {/* 좋아요/조회수 */}
+                <div className="flex items-center justify-between px-4 pb-4 pt-2">
+                  <div className="flex items-center gap-3">
+                    <span className="flex items-center gap-1 text-pink-500 font-bold">
+                      <svg width="18" height="18" fill="none" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41 0.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="currentColor"/></svg>
+                      {marker.likes}
+                    </span>
+                    <span className="flex items-center gap-1 text-blue-400 font-bold">
+                      <svg width="18" height="18" fill="none" viewBox="0 0 24 24"><path d="M12 4.5c-7.33 0-10 6.28-10 7.5s2.67 7.5 10 7.5 10-6.28 10-7.5-2.67-7.5-10-7.5zm0 13c-5.05 0-8.13-4.32-8.82-5.5C3.87 9.82 6.95 5.5 12 5.5s8.13 4.32 8.82 5.5c-0.69 1.18-3.77 5.5-8.82 5.5z" fill="currentColor"/></svg>
+                      {marker.views}
+                    </span>
+                  </div>
+                  <button
+                    className="text-xs text-blue-500 font-semibold hover:underline"
+                    onClick={() => handleMarkerClick(marker)}
                   >
-                    {tag.trim()}
-                  </span>
-                ))}
-              </div>
-              {/* 설명 */}
-              <div className="px-4 pt-2 pb-1">
-                <div className="text-gray-800 text-sm font-medium line-clamp-2 whitespace-pre-line">
-                  {marker.description}
+                    상세보기
+                  </button>
                 </div>
               </div>
-              {/* 좋아요/조회수 */}
-              <div className="flex items-center justify-between px-4 pb-4 pt-2">
-                <div className="flex items-center gap-3">
-                  <span className="flex items-center gap-1 text-pink-500 font-bold">
-                    <svg width="18" height="18" fill="none" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41 0.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="currentColor"/></svg>
-                    {marker.likes}
-                  </span>
-                  <span className="flex items-center gap-1 text-blue-400 font-bold">
-                    <svg width="18" height="18" fill="none" viewBox="0 0 24 24"><path d="M12 4.5c-7.33 0-10 6.28-10 7.5s2.67 7.5 10 7.5 10-6.28 10-7.5-2.67-7.5-10-7.5zm0 13c-5.05 0-8.13-4.32-8.82-5.5C3.87 9.82 6.95 5.5 12 5.5s8.13 4.32 8.82 5.5c-0.69 1.18-3.77 5.5-8.82 5.5z" fill="currentColor"/></svg>
-                    {marker.views}
-                  </span>
-                </div>
-                <button
-                  className="text-xs text-blue-500 font-semibold hover:underline"
-                  onClick={() => handleMarkerClick(marker)}
-                >
-                  상세보기
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
         {/* 상세 모달 등 기존 코드 유지 */}
         {detailModalOpen && selectedMarker && (
           <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/70">
