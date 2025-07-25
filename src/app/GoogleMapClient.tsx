@@ -33,6 +33,15 @@ interface MarkerData {
   }[];
 }
 
+interface ClusterData {
+  h3_index: string;
+  lat: number;
+  lng: number;
+  count: number;
+  marker_ids: number[];
+  markers?: MarkerData[];
+}
+
 export default function GoogleMapClient() {
   const [markers, setMarkers] = useState<MarkerData[]>([]);
   const [selectedMarker, setSelectedMarker] = useState<MarkerData | null>(null);
@@ -74,6 +83,8 @@ export default function GoogleMapClient() {
   const [detailModalMarker, setDetailModalMarker] = useState<MarkerData | null>(null);
   const [detailModalImages, setDetailModalImages] = useState<string[]>([]);
   const [detailModalIndex, setDetailModalIndex] = useState(0);
+  const [clusters, setClusters] = useState<ClusterData[]>([]);
+  const [isClusterLoading, setIsClusterLoading] = useState(false);
 
   // 감성태그 입력 핸들러
   const handleEmotionInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -256,7 +267,7 @@ export default function GoogleMapClient() {
         const lat_delta = Math.abs(ne.lat() - sw.lat()) / 2;
         const lng_delta = Math.abs(ne.lng() - sw.lng()) / 2;
 
-        const response = await apiClient.get(`/markers?lat=${lat}&lng=${lng}&lat_delta=${lat_delta}&lng_delta=${lng_delta}&limit=200`);
+        const response = await apiClient.get(`/markers?lat=${lat}&lng=${lng}&lat_delta=${lat_delta}&lng_delta=${lng_delta}&limit=60`);
         const data = response.data;
         console.log('API 응답:', data);
         console.log('마커 개수:', data.data?.length || 0);
@@ -286,14 +297,35 @@ export default function GoogleMapClient() {
     }, 300); // 300ms 디바운싱
   }, []);
 
+  // 클러스터 API로 데이터 fetch
+  const fetchClusters = useCallback(async (bounds: google.maps.LatLngBounds | null) => {
+    if (!bounds) return;
+    const ne = bounds.getNorthEast();
+    const sw = bounds.getSouthWest();
+    const lat = (ne.lat() + sw.lat()) / 2;
+    const lng = (ne.lng() + sw.lng()) / 2;
+    const lat_delta = Math.abs(ne.lat() - sw.lat()) / 2;
+    const lng_delta = Math.abs(ne.lng() - sw.lng()) / 2;
+    const limit = 500;
+    try {
+      setIsClusterLoading(true);
+      const response = await apiClient.get(`/markers/cluster?lat=${lat}&lng=${lng}&lat_delta=${lat_delta}&lng_delta=${lng_delta}&limit=${limit}`);
+      console.log('클러스터 응답:', response.data);
+      setClusters(response.data.data || response.data);
+    } catch (e) {
+      console.error('클러스터 데이터 로딩 실패:', e);
+    } finally {
+      setIsClusterLoading(false);
+    }
+  }, []);
+
+  // 지도 바운드 변경 시 클러스터 fetch
   const onBoundsChanged = useCallback(() => {
     if (mapRef.current) {
       const bounds = mapRef.current.getBounds();
-      if (bounds) {
-        fetchMarkers(bounds);
-      }
+      if (bounds) fetchClusters(bounds);
     }
-  }, [fetchMarkers]);
+  }, [fetchClusters]);
 
   const onZoomChanged = useCallback(() => {
     if (mapRef.current) {
@@ -329,58 +361,29 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
     },
   ];
 
-  // 클러스터링 적용
-  // useEffect(() => {
-  //   console.log('클러스터링 조건 확인:', {
-  //     mapLoaded,
-  //     markerCount: markerRefs.current.length,
-  //     markersLength: markers.length,
-  //     hasGoogleMaps: !!window.google?.maps,
-  //     currentZoom
-  //   });
-    
-  //   if (mapLoaded && markers.length > 0 && window.google?.maps && currentZoom < 10) {
-  //     console.log('클러스터링 적용 중...');
-      
-  //     // 기존 클러스터러 제거
-  //     if (clustererRef.current) {
-  //       clustererRef.current.clearMarkers();
-  //     }
-
-  //     // 새로운 클러스터러 생성
-  //     clustererRef.current = new MarkerClusterer({
-  //       map: mapRef.current!,
-  //       markers: markerRefs.current,
-  //       renderer: {
-  //         render: ({ count, position }) => {
-  //           const clusterMarker = new window.google.maps.Marker({
-  //             position,
-  //             label: {
-  //               text: count.toString(),
-  //               color: 'white',
-  //               fontSize: '14px',
-  //               fontWeight: 'bold',
-  //             },
-  //             icon: {
-  //               path: window.google.maps.SymbolPath.CIRCLE,
-  //               scale: 20,
-  //               fillColor: '#4285F4',
-  //               fillOpacity: 0.8,
-  //               strokeColor: '#ffffff',
-  //               strokeWeight: 2,
-  //             },
-  //           });
-  //           return clusterMarker;
-  //         },
-  //       },
-  //     });
-  //     console.log('클러스터링 완료');
-  //   } else if (clustererRef.current && currentZoom >= 10) {
-  //     // 줌 레벨이 높으면 클러스터링 제거
-  //     clustererRef.current.clearMarkers();
-  //     clustererRef.current = null;
-  //   }
-  // }, [mapLoaded, markers.length, currentZoom]);
+  // 클러스터링 설정 - 줌레벨에 따라 gridSize 동적 조정
+  const getClustererOptions = () => {
+    let gridSize = 60;
+    if (currentZoom <= 10) {
+      gridSize = 30;
+    } else if (currentZoom <= 12) {
+      gridSize = 60;
+    }
+    return {
+      gridSize,
+      maxZoom: 12,
+      minimumClusterSize: 2,
+      styles: [
+        {
+          url: 'https://developers.google.com/maps/documentation/javascript/examples/markerclusterer/m1.png',
+          textColor: 'white',
+          textSize: 18,
+          height: 70,
+          width: 70,
+        },
+      ],
+    };
+  };
 
   const createCustomMarkerIcon = useCallback((imageUrl: string) => {
     if (!window.google?.maps) {
@@ -397,8 +400,18 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
       return undefined;
     }
     
-    // 이미지 크기를 50x50으로 고정
-    const size = 50;
+    // 줌 레벨에 따라 마커 크기 조정
+    let size = 50; // 기본 크기
+    if (currentZoom <= 8) {
+      size = 80; // 매우 축소된 상태에서는 큰 마커
+    } else if (currentZoom <= 10) {
+      size = 65; // 축소된 상태에서는 중간 크기 마커
+    } else if (currentZoom <= 12) {
+      size = 55; // 보통 상태에서는 약간 큰 마커
+    } else {
+      size = 45; // 확대된 상태에서는 작은 마커
+    }
+    
     const anchor = size / 2;
     
     const iconConfig = {
@@ -407,7 +420,7 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
       anchor: new window.google.maps.Point(anchor, anchor),
     };
     
-    console.log('아이콘 설정:', iconConfig);
+    console.log('아이콘 설정 (줌 레벨:', currentZoom, '크기:', size, '):', iconConfig);
     return iconConfig;
   }, [currentZoom]);
 
@@ -783,11 +796,59 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
               마커 로딩 중...
             </div>
           )}
+          {isClusterLoading && (
+            <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/20 pointer-events-none">
+              <div className="w-12 h-12 border-4 border-blue-400 border-t-transparent rounded-full animate-spin" />
+            </div>
+          )}
         
         {/* 클러스터링 적용 */}
-        <MarkerClusterer options={{ styles: clusterStyles }}>
+        <MarkerClusterer options={getClustererOptions()}>
           {(clusterer) => (
             <>
+              {clusters.map((cluster) => {
+                if (cluster.count === 1 && cluster.markers && cluster.markers.length > 0) {
+                  const marker = cluster.markers[0];
+                  const icon = createCustomMarkerIcon(marker.thumbnailImg);
+                  return (
+                    <Marker
+                      key={cluster.h3_index}
+                      position={{ lat: marker.latitude, lng: marker.longitude }}
+                      icon={icon}
+                      onClick={() => setSelectedMarker(marker)}
+                    />
+                  );
+                } else {
+                  return (
+                    <Marker
+                      key={cluster.h3_index}
+                      position={{ lat: cluster.lat, lng: cluster.lng }}
+                      label={{
+                        text: cluster.count.toString(),
+                        color: 'white',
+                        fontSize: '16px',
+                        fontWeight: 'bold',
+                      }}
+                      icon={{
+                        path: window.google.maps.SymbolPath.CIRCLE,
+                        scale: 20 + Math.log2(cluster.count) * 8,
+                        fillColor: '#4285F4',
+                        fillOpacity: 0.85,
+                        strokeColor: '#fff',
+                        strokeWeight: 2,
+                      }}
+                      onClick={() => {
+                        if (mapRef.current) {
+                          const zoom = mapRef.current.getZoom() ?? 14;
+                          mapRef.current.setZoom(zoom + 2);
+                          mapRef.current.panTo({ lat: cluster.lat, lng: cluster.lng });
+                        }
+                      }}
+                    />
+                  );
+                }
+              })}
+
               {markers.map((marker, index) => {
                 const icon = createCustomMarkerIcon(marker.thumbnailImg);
                 return (
@@ -1014,57 +1075,37 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
         <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/70">
           <div className="relative bg-white rounded-3xl shadow-2xl max-w-lg w-full flex flex-col overflow-hidden border border-blue-100">
             <button className="absolute top-4 right-4 text-3xl text-blue-400 hover:text-blue-700 z-10 bg-white rounded-full shadow p-2 transition" onClick={() => setDetailModalOpen(false)}>&times;</button>
-            {/* 이미지 슬라이드 */}
-            <div className="flex flex-col items-center justify-center bg-gradient-to-b from-blue-50 to-white" style={{ minHeight: '320px' }}>
-              {/* 썸네일 이미지 (고정 표시) */}
+            {/* 이미지 섹션 */}
+            <div className="bg-gradient-to-b from-blue-50 to-white p-6">
+              {/* 썸네일 이미지 */}
               {detailModalImages.length > 0 && (
-                <img
-                  src={detailModalImages[0]}
-                  alt="썸네일"
-                  className="max-h-72 max-w-full rounded-2xl object-contain shadow-lg border-2 border-blue-100 mt-8 mb-3 transition-all duration-200"
-                />
-              )}
-              
-              {/* 상세 이미지 확대 영역 */}
-              {detailModalImages.length > 1 && (
-                <div className="w-full px-4">
-                  <div className="text-center mb-2">
-                    <span className="text-sm font-semibold text-blue-700">상세 이미지</span>
-                  </div>
-                  {/* 상세이미지 확대 표시 */}
-                  <div className="mb-3 flex justify-center items-center">
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold text-blue-700 mb-3 text-center">썸네일</h3>
+                  <div className="flex justify-center">
                     <img
-                      src={detailModalImages[detailModalIndex]}
-                      alt={`상세이미지${detailModalIndex}`}
-                      className="max-h-48 max-w-full rounded-xl object-contain shadow-md border border-gray-200"
+                      src={detailModalImages[0]}
+                      alt="썸네일"
+                      className="max-h-64 max-w-full rounded-2xl object-contain shadow-lg border-2 border-blue-100"
                     />
-                  </div>
-                  {/* 상세이미지 썸네일 리스트 */}
-                  <div className="flex gap-2 flex-wrap justify-center mb-4">
-                    {detailModalImages.slice(1).map((img, idx) => (
-                      <img
-                        key={idx}
-                        src={img}
-                        alt={`상세이미지${idx+1}`}
-                        className={`w-14 h-14 object-cover rounded-lg border-2 cursor-pointer transition-all duration-150 ${detailModalIndex===idx+1 ? 'ring-2 ring-blue-500 border-blue-500 scale-105' : 'border-gray-200'}`}
-                        onClick={() => setDetailModalIndex(idx+1)}
-                      />
-                    ))}
                   </div>
                 </div>
               )}
               
-              {/* 좌우 이동 버튼 (상세이미지가 있을 때만) */}
+              {/* 상세 이미지 그리드 */}
               {detailModalImages.length > 1 && (
-                <div className="flex gap-4 mt-2 mb-2 justify-center">
-                  <button
-                    className="px-4 py-2 bg-blue-100 text-blue-700 rounded-full text-lg font-bold hover:bg-blue-200 shadow"
-                    onClick={() => setDetailModalIndex((prev) => prev === 0 ? detailModalImages.length-1 : prev-1)}
-                  >&lt;</button>
-                  <button
-                    className="px-4 py-2 bg-blue-100 text-blue-700 rounded-full text-lg font-bold hover:bg-blue-200 shadow"
-                    onClick={() => setDetailModalIndex((prev) => prev === detailModalImages.length-1 ? 0 : prev+1)}
-                  >&gt;</button>
+                <div>
+                  <h3 className="text-lg font-semibold text-blue-700 mb-3 text-center">상세 이미지</h3>
+                  <div className="grid grid-cols-3 gap-3">
+                    {detailModalImages.slice(1, 4).map((img, idx) => (
+                      <div key={idx} className="aspect-square">
+                        <img
+                          src={img}
+                          alt={`상세이미지${idx+1}`}
+                          className="w-full h-full object-cover rounded-xl shadow-md border border-gray-200"
+                        />
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
