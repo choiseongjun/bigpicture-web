@@ -25,6 +25,12 @@ interface MarkerData {
   likes: number;
   views: number;
   createdAt: string;
+  images: {
+    imageUrl: string;
+    imageType: 'thumbnail' | 'detail';
+    imageOrder: number;
+    isPrimary: boolean;
+  }[];
 }
 
 export default function GoogleMapClient() {
@@ -64,6 +70,10 @@ export default function GoogleMapClient() {
   const [imageViewerOpen, setImageViewerOpen] = useState(false);
   const [imageViewerImages, setImageViewerImages] = useState<string[]>([]);
   const [imageViewerIndex, setImageViewerIndex] = useState(0);
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [detailModalMarker, setDetailModalMarker] = useState<MarkerData | null>(null);
+  const [detailModalImages, setDetailModalImages] = useState<string[]>([]);
+  const [detailModalIndex, setDetailModalIndex] = useState(0);
 
   // 감성태그 입력 핸들러
   const handleEmotionInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -638,17 +648,23 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
 
   console.log('렌더링할 마커 개수:', markers.length, '현재 줌:', currentZoom);
 
-  // InfoWindow에서 이미지 클릭 시 뷰어 오픈
+  // InfoWindow에서 이미지 클릭 시 상세정보 모달 오픈
   const handleMarkerImageClick = (marker: MarkerData) => {
     const images: string[] = [];
+    // 썸네일 이미지 추가
     if (marker.thumbnailImg) images.push(getFullImageUrl(marker.thumbnailImg) ?? '');
-    // 상세이미지(추가 구현 필요: marker.detailImages 등)
-    if ((marker as any).detailImages && Array.isArray((marker as any).detailImages)) {
-      (marker as any).detailImages.forEach((img: string) => images.push(getFullImageUrl(img) ?? ''));
+    // 상세이미지들 추가 (marker.images 배열에서 detail 타입만)
+    if ((marker as any).images && Array.isArray((marker as any).images)) {
+      const detailImages = (marker as any).images
+        .filter((img: any) => img.imageType === 'detail')
+        .sort((a: any, b: any) => a.imageOrder - b.imageOrder)
+        .map((img: any) => getFullImageUrl(img.imageUrl) ?? '');
+      images.push(...detailImages);
     }
-    setImageViewerImages(images.filter(Boolean));
-    setImageViewerIndex(0);
-    setImageViewerOpen(true);
+    setDetailModalMarker(marker);
+    setDetailModalImages(images.filter(Boolean));
+    setDetailModalIndex(0);
+    setDetailModalOpen(true);
   };
 
   return (
@@ -839,20 +855,33 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
             onCloseClick={() => setSelectedMarker(null)}
           >
             <div className="p-2 max-w-xs">
-              <div className="flex items-center gap-2 mb-2">
-                <img 
-                  src={getFullImageUrl(selectedMarker.thumbnailImg)}
-                  alt="썸네일"
-                  className="w-12 h-12 rounded-full object-cover cursor-pointer border-2 border-blue-400 hover:scale-105 transition"
-                  onClick={() => handleMarkerImageClick(selectedMarker)}
-                />
-                <div>
-                  <div className="font-semibold text-sm">{selectedMarker.author}</div>
-                  <div className="text-2xl">{selectedMarker.emotionTag}</div>
+              <div className="flex gap-2 mb-2 items-start">
+                <div className="flex flex-col items-center gap-1">
+                  <img 
+                    src={getFullImageUrl(selectedMarker.thumbnailImg)}
+                    alt="썸네일"
+                    className="w-12 h-12 rounded-xl object-cover cursor-pointer border-2 border-blue-200 hover:brightness-90 hover:scale-105 transition duration-150 shadow-sm"
+                    onClick={() => handleMarkerImageClick(selectedMarker)}
+                  />
+                  <button
+                    className="mt-1 px-2 py-0.5 bg-blue-100 text-blue-600 rounded-full text-[11px] flex items-center gap-1 shadow-sm hover:bg-blue-200 transition border border-blue-200"
+                    onClick={e => { e.stopPropagation(); handleMarkerImageClick(selectedMarker); }}
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" fill="none"/><path d="M21 21l-4.35-4.35" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+                    상세
+                  </button>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-bold text-[13px] text-blue-900 leading-tight mb-0.5">{selectedMarker.author}</div>
+                  <div className="flex flex-wrap gap-1 mb-0.5">
+                    {selectedMarker.emotionTag && selectedMarker.emotionTag.split(',').map((tag, idx) => (
+                      <span key={idx} className="inline-flex items-center px-2 py-0.5 bg-gradient-to-r from-pink-100 via-blue-50 to-yellow-100 text-blue-700 rounded-full text-[11px] font-semibold shadow border border-blue-100">#{tag}</span>
+                    ))}
+                  </div>
+                  <p className="text-[13px] text-gray-800 mb-1 leading-snug font-medium truncate">{selectedMarker.description}</p>
                 </div>
               </div>
-              <p className="text-sm text-gray-700 mb-2">{selectedMarker.description}</p>
-              <div className="flex justify-between text-xs text-gray-500">
+              <div className="flex justify-between text-[11px] text-gray-400 mt-1">
                 <span>❤️ {selectedMarker.likes}</span>
                 <span>👁️ {selectedMarker.views}</span>
                 <span>{new Date(selectedMarker.createdAt).toLocaleDateString()}</span>
@@ -980,44 +1009,90 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
           </div>
         </div>
       )}
-      {/* 이미지 뷰어 모달 */}
-      {imageViewerOpen && (
+      {/* 상세정보 모달 */}
+      {detailModalOpen && detailModalMarker && (
         <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/70">
-          <div className="relative bg-white rounded-2xl shadow-2xl max-w-lg w-full p-0 flex flex-col">
-            <button className="absolute top-2 right-2 text-3xl text-gray-400 hover:text-gray-700 z-10" onClick={() => setImageViewerOpen(false)}>&times;</button>
-            <div className="flex-1 flex flex-col items-center justify-center p-6">
-              {imageViewerImages.length > 0 && (
+          <div className="relative bg-white rounded-3xl shadow-2xl max-w-lg w-full flex flex-col overflow-hidden border border-blue-100">
+            <button className="absolute top-4 right-4 text-3xl text-blue-400 hover:text-blue-700 z-10 bg-white rounded-full shadow p-2 transition" onClick={() => setDetailModalOpen(false)}>&times;</button>
+            {/* 이미지 슬라이드 */}
+            <div className="flex flex-col items-center justify-center bg-gradient-to-b from-blue-50 to-white" style={{ minHeight: '320px' }}>
+              {/* 썸네일 이미지 (고정 표시) */}
+              {detailModalImages.length > 0 && (
                 <img
-                  src={imageViewerImages[imageViewerIndex]}
-                  alt={`미리보기${imageViewerIndex+1}`}
-                  className="max-h-[60vh] max-w-full rounded-xl object-contain shadow-lg border mb-4"
+                  src={detailModalImages[0]}
+                  alt="썸네일"
+                  className="max-h-72 max-w-full rounded-2xl object-contain shadow-lg border-2 border-blue-100 mt-8 mb-3 transition-all duration-200"
                 />
               )}
-              {/* 썸네일/상세 이미지 썸네일 리스트 */}
-              <div className="flex gap-2 mt-2 flex-wrap justify-center">
-                {imageViewerImages.map((img, idx) => (
-                  <img
-                    key={idx}
-                    src={img}
-                    alt={`썸네일${idx+1}`}
-                    className={`w-16 h-16 object-cover rounded-lg border cursor-pointer ${imageViewerIndex===idx ? 'ring-2 ring-blue-500' : ''}`}
-                    onClick={() => setImageViewerIndex(idx)}
-                  />
-                ))}
-              </div>
-              {/* 좌우 이동 버튼 */}
-              {imageViewerImages.length > 1 && (
-                <div className="flex gap-4 mt-4 justify-center">
+              
+              {/* 상세 이미지 확대 영역 */}
+              {detailModalImages.length > 1 && (
+                <div className="w-full px-4">
+                  <div className="text-center mb-2">
+                    <span className="text-sm font-semibold text-blue-700">상세 이미지</span>
+                  </div>
+                  {/* 상세이미지 확대 표시 */}
+                  <div className="mb-3 flex justify-center items-center">
+                    <img
+                      src={detailModalImages[detailModalIndex]}
+                      alt={`상세이미지${detailModalIndex}`}
+                      className="max-h-48 max-w-full rounded-xl object-contain shadow-md border border-gray-200"
+                    />
+                  </div>
+                  {/* 상세이미지 썸네일 리스트 */}
+                  <div className="flex gap-2 flex-wrap justify-center mb-4">
+                    {detailModalImages.slice(1).map((img, idx) => (
+                      <img
+                        key={idx}
+                        src={img}
+                        alt={`상세이미지${idx+1}`}
+                        className={`w-14 h-14 object-cover rounded-lg border-2 cursor-pointer transition-all duration-150 ${detailModalIndex===idx+1 ? 'ring-2 ring-blue-500 border-blue-500 scale-105' : 'border-gray-200'}`}
+                        onClick={() => setDetailModalIndex(idx+1)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* 좌우 이동 버튼 (상세이미지가 있을 때만) */}
+              {detailModalImages.length > 1 && (
+                <div className="flex gap-4 mt-2 mb-2 justify-center">
                   <button
-                    className="px-4 py-2 bg-gray-200 rounded-full text-lg font-bold hover:bg-gray-300"
-                    onClick={() => setImageViewerIndex((prev) => prev === 0 ? imageViewerImages.length-1 : prev-1)}
+                    className="px-4 py-2 bg-blue-100 text-blue-700 rounded-full text-lg font-bold hover:bg-blue-200 shadow"
+                    onClick={() => setDetailModalIndex((prev) => prev === 0 ? detailModalImages.length-1 : prev-1)}
                   >&lt;</button>
                   <button
-                    className="px-4 py-2 bg-gray-200 rounded-full text-lg font-bold hover:bg-gray-300"
-                    onClick={() => setImageViewerIndex((prev) => prev === imageViewerImages.length-1 ? 0 : prev+1)}
+                    className="px-4 py-2 bg-blue-100 text-blue-700 rounded-full text-lg font-bold hover:bg-blue-200 shadow"
+                    onClick={() => setDetailModalIndex((prev) => prev === detailModalImages.length-1 ? 0 : prev+1)}
                   >&gt;</button>
                 </div>
               )}
+            </div>
+            {/* 정보 카드 */}
+            <div className="p-6 flex flex-col gap-3 border-t border-blue-100 bg-white">
+              <div className="flex items-center gap-3 mb-2">
+                <span className="font-semibold text-lg text-blue-700 flex items-center gap-1">
+                  <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                  {detailModalMarker.author}
+                </span>
+                <span className="text-xs text-gray-400 flex items-center gap-1">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                  {new Date(detailModalMarker.createdAt).toLocaleDateString()}
+                </span>
+              </div>
+              <div className="flex gap-2 flex-wrap mb-2">
+                {/* 감성태그 chip */}
+                {detailModalMarker.emotionTag && detailModalMarker.emotionTag.split(',').map((tag, idx) => (
+                  <span key={idx} className="inline-flex items-center px-3 py-1 bg-gradient-to-r from-pink-200 via-blue-100 to-yellow-100 text-blue-700 rounded-full text-sm font-semibold shadow-sm border border-blue-200 mr-2 mb-2">#{tag}</span>
+                ))}
+              </div>
+              <div className="text-lg text-gray-800 mb-2 whitespace-pre-line font-medium leading-relaxed">
+                {detailModalMarker.description}
+              </div>
+              <div className="flex gap-6 text-gray-500 text-base mt-2 border-t border-blue-50 pt-3">
+                <span className="flex items-center gap-1"><svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 15a7 7 0 0014 0M12 10v4m0 0h4m-4 0H8" /></svg> {detailModalMarker.likes}</span>
+                <span className="flex items-center gap-1"><svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg> {detailModalMarker.views}</span>
+              </div>
             </div>
           </div>
         </div>
