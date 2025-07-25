@@ -85,6 +85,7 @@ export default function GoogleMapClient() {
   const [detailModalIndex, setDetailModalIndex] = useState(0);
   const [clusters, setClusters] = useState<ClusterData[]>([]);
   const [isClusterLoading, setIsClusterLoading] = useState(false);
+  const clusterDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
   // 감성태그 입력 핸들러
   const handleEmotionInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -320,12 +321,16 @@ export default function GoogleMapClient() {
   }, []);
 
   // 지도 바운드 변경 시 클러스터 fetch
-  const onBoundsChanged = useCallback(() => {
-    if (mapRef.current) {
-      const bounds = mapRef.current.getBounds();
-      if (bounds) fetchClusters(bounds);
+  const handleBoundsChanged = () => {
+    if (!mapRef.current) return;
+    const bounds = mapRef.current.getBounds();
+    if (clusterDebounceRef.current) {
+      clearTimeout(clusterDebounceRef.current);
     }
-  }, [fetchClusters]);
+    clusterDebounceRef.current = setTimeout(() => {
+      fetchClusters(bounds ?? null);
+    }, 500);
+  };
 
   const onZoomChanged = useCallback(() => {
     if (mapRef.current) {
@@ -579,6 +584,9 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
       if (fetchTimeoutRef.current) {
         clearTimeout(fetchTimeoutRef.current);
       }
+      if (clusterDebounceRef.current) {
+        clearTimeout(clusterDebounceRef.current);
+      }
     };
   }, []);
 
@@ -777,7 +785,7 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
           center={center}
           zoom={14}
           onLoad={onMapLoad}
-          onBoundsChanged={onBoundsChanged}
+          onBoundsChanged={handleBoundsChanged}
           onZoomChanged={onZoomChanged}
           onClick={handleMapClick}
           options={{
