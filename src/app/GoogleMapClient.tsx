@@ -846,19 +846,6 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
               🔍
             </button>
             
-            {/* 테스트 버튼 - 지도 이동 테스트용 */}
-            {/* <button
-              onClick={() => {
-                if (mapRef.current) {
-                  console.log('테스트: 서울로 이동');
-                  mapRef.current.panTo({ lat: 37.5665, lng: 126.9780 });
-                  mapRef.current.setZoom(15);
-                }
-              }}
-              className="absolute right-12 top-1/2 transform -translate-y-1/2 text-blue-500 hover:text-blue-700 text-xs"
-            >
-              테스트
-            </button> */}
             
             {/* 검색 결과 드롭다운 */}
             {showSearchResults && searchResults.length > 0 && (
@@ -917,7 +904,7 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
         <MarkerClusterer options={getClustererOptions()}>
           {(clusterer) => (
             <>
-              {!isPlacingMarker && clusters.map((cluster) => {
+              {/* {!isPlacingMarker && clusters.map((cluster) => {
                 if (cluster.count === 1 && cluster.markers && cluster.markers.length > 1) {
                   // 동일 위치에 여러 마커가 겹친 경우
                   const markerGroup = cluster.markers;
@@ -1004,7 +991,7 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                     />
                   );
                 }
-              })}
+              })} */}
 
               {!isPlacingMarker && markerGroups.map((group, idx) => {
                 if (!group) return null;
@@ -1110,46 +1097,7 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
           </>
         )}
 
-        {/* {selectedMarker && (
-          <InfoWindow
-            position={{ lat: selectedMarker.latitude, lng: selectedMarker.longitude }}
-            onCloseClick={() => setSelectedMarker(null)}
-          >
-            <div className="p-2 max-w-xs">
-              <div className="flex gap-2 mb-2 items-start">
-                <div className="flex flex-col items-center gap-1">
-                  <img 
-                    src={getFullImageUrl(selectedMarker.thumbnailImg)}
-                    alt="썸네일"
-                    className="w-12 h-12 rounded-xl object-cover cursor-pointer border-2 border-blue-200 hover:brightness-90 hover:scale-105 transition duration-150 shadow-sm"
-                    onClick={() => handleMarkerImageClick(selectedMarker)}
-                  />
-                  <button
-                    className="mt-1 px-2 py-0.5 bg-blue-100 text-blue-600 rounded-full text-[11px] flex items-center gap-1 shadow-sm hover:bg-blue-200 transition border border-blue-200"
-                    onClick={e => { e.stopPropagation(); handleMarkerImageClick(selectedMarker); }}
-                  >
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" fill="none"/><path d="M21 21l-4.35-4.35" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
-                    상세
-                  </button>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-bold text-[13px] text-blue-900 leading-tight mb-0.5">{selectedMarker.author}</div>
-                  <div className="flex flex-wrap gap-1 mb-0.5">
-                    {selectedMarker.emotionTag && selectedMarker.emotionTag.split(',').map((tag, idx) => (
-                      <span key={idx} className="inline-flex items-center px-2 py-0.5 bg-gradient-to-r from-pink-100 via-blue-50 to-yellow-100 text-blue-700 rounded-full text-[11px] font-semibold shadow border border-blue-100">#{tag}</span>
-                    ))}
-                  </div>
-                  <p className="text-[13px] text-gray-800 mb-1 leading-snug font-medium truncate">{selectedMarker.description}</p>
-                </div>
-              </div>
-              <div className="flex justify-between text-[11px] text-gray-400 mt-1">
-                <span>❤️ {selectedMarker.likes}</span>
-                <span>👁️ {selectedMarker.views}</span>
-                <span>{new Date(selectedMarker.createdAt).toLocaleDateString()}</span>
-              </div>
-            </div>
-          </InfoWindow>
-        )} */}
+        
         {selectedMarker && multiMarkers.length > 0 && (
           <InfoWindow
             position={{ lat: selectedMarker.latitude, lng: selectedMarker.longitude }}
