@@ -25,6 +25,7 @@ interface MarkerData {
   likes: number;
   views: number;
   createdAt: string;
+  isLiked?: boolean; // 좋아요 상태
   images: {
     imageUrl: string;
     imageType: 'thumbnail' | 'detail' | 'gallery';
@@ -92,6 +93,55 @@ export default function GoogleMapClient() {
   const [multiMarkerIndex, setMultiMarkerIndex] = useState(0);
   // 인증 상태 관리
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  
+  // 좋아요 로딩 상태 관리
+  const [likeLoading, setLikeLoading] = useState<Set<number>>(new Set());
+
+  // 좋아요 토글 함수
+  const handleLikeToggle = async (markerId: number) => {
+    if (!isLoggedIn) {
+      alert('로그인이 필요합니다.');
+      return;
+    }
+    
+    // 이미 로딩 중이면 무시
+    if (likeLoading.has(markerId)) return;
+    
+    // 로딩 상태 설정
+    setLikeLoading(prev => new Set([...prev, markerId]));
+    
+    try {
+      const response = await apiClient.post(`/markers/${markerId}/like`);
+      const { is_liked, likes } = response.data; // API 응답 필드명에 맞춤
+      
+      // 좋아요 상태는 마커 데이터의 isLiked 필드로 관리하므로 별도 Set 업데이트 불필요
+      
+      // 마커 데이터 업데이트 (isLiked 상태도 함께 업데이트)
+      setDetailModalMarker(prev => prev ? { 
+        ...prev, 
+        likes: likes, 
+        isLiked: is_liked 
+      } : null);
+      setMultiMarkers(prev => prev.map(marker => 
+        marker.id === markerId ? { 
+          ...marker, 
+          likes: likes, 
+          isLiked: is_liked 
+        } : marker
+      ));
+      
+    } catch (error) {
+      console.error('좋아요 토글 실패:', error);
+      alert('좋아요 처리에 실패했습니다.');
+    } finally {
+      // 로딩 상태 해제
+      setLikeLoading(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(markerId);
+        return newSet;
+      });
+    }
+  };
 
   // 로그인 상태 확인
   useEffect(() => {
@@ -1413,8 +1463,39 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                 {detailModalMarker.description}
               </div>
               <div className="flex gap-6 text-gray-500 text-base mt-2 border-t border-blue-50 pt-3">
-                <span className="flex items-center gap-1"><svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 15a7 7 0 0014 0M12 10v4m0 0h4m-4 0H8" /></svg> {detailModalMarker.likes}</span>
-                <span className="flex items-center gap-1"><svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg> {detailModalMarker.views}</span>
+                {/* YouTube 스타일 좋아요 버튼 */}
+                <button
+                  onClick={() => handleLikeToggle(detailModalMarker.id)}
+                  disabled={likeLoading.has(detailModalMarker.id)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed bg-gray-100 text-gray-700 hover:bg-gray-200"
+                >
+                  {likeLoading.has(detailModalMarker.id) ? (
+                    <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  ) : (
+                    <svg 
+                      className={`w-5 h-5 transition-all duration-200 ${
+                        detailModalMarker.isLiked 
+                          ? 'fill-red-500 text-red-500 scale-110' 
+                          : 'stroke-current fill-none text-gray-700'
+                      }`}
+                      viewBox="0 0 24 24"
+                    >
+                      <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                    </svg>
+                  )}
+                  <span className="font-semibold">{detailModalMarker.likes}</span>
+                </button>
+                
+                {/* 조회수 표시 */}
+                <span className="flex items-center gap-1 px-4 py-2 bg-gray-100 rounded-full">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  <span className="font-semibold">{detailModalMarker.views}</span>
+                </span>
               </div>
             </div>
           </div>
@@ -1503,8 +1584,39 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                 {multiMarkers[multiMarkerIndex].description}
               </div>
               <div className="flex gap-6 text-gray-500 text-base mt-2 border-t border-blue-50 pt-3">
-                <span className="flex items-center gap-1"><svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 15a7 7 0 0014 0M12 10v4m0 0h4m-4 0H8" /></svg> {multiMarkers[multiMarkerIndex].likes}</span>
-                <span className="flex items-center gap-1"><svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg> {multiMarkers[multiMarkerIndex].views}</span>
+                {/* YouTube 스타일 좋아요 버튼 */}
+                <button
+                  onClick={() => handleLikeToggle(multiMarkers[multiMarkerIndex].id)}
+                  disabled={likeLoading.has(multiMarkers[multiMarkerIndex].id)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed bg-gray-100 text-gray-700 hover:bg-gray-200"
+                >
+                  {likeLoading.has(multiMarkers[multiMarkerIndex].id) ? (
+                    <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  ) : (
+                    <svg 
+                      className={`w-5 h-5 transition-all duration-200 ${
+                        multiMarkers[multiMarkerIndex].isLiked 
+                          ? 'fill-red-500 text-red-500 scale-110' 
+                          : 'stroke-current fill-none text-gray-700'
+                      }`}
+                      viewBox="0 0 24 24"
+                    >
+                      <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                    </svg>
+                  )}
+                  <span className="font-semibold">{multiMarkers[multiMarkerIndex].likes}</span>
+                </button>
+                
+                {/* 조회수 표시 */}
+                <span className="flex items-center gap-1 px-4 py-2 bg-gray-100 rounded-full">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  <span className="font-semibold">{multiMarkers[multiMarkerIndex].views}</span>
+                </span>
               </div>
             </div>
           </div>
