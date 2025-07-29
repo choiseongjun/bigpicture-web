@@ -740,9 +740,32 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
     return groups;
   }
 
-  // 모든 마커를 1차원 배열로 추출 후 그룹핑
-  const allMarkers = clusters.flatMap(cluster => cluster.markers || []);
-  const markerGroups = groupMarkersByDistance(allMarkers, 30);
+  let allMarkers: MarkerData[] = [];
+  if (currentZoom >= 15) {
+    allMarkers = clusters.flatMap(cluster => cluster.markers || []);
+  } else {
+    allMarkers = clusters.map(cluster => {
+      if (cluster.markers && cluster.markers.length > 0) {
+        return cluster.markers[0];
+      }
+      return {
+        id: -1,
+        latitude: cluster.lat,
+        longitude: cluster.lng,
+        description: '',
+        author: '',
+        emotionTag: '',
+        thumbnailImg: '',
+        likes: 0,
+        views: 0,
+        createdAt: '',
+        images: [],
+      };
+    });
+  }
+  const markerGroups = currentZoom >= 15
+    ? groupMarkersByDistance(allMarkers, 30)
+    : allMarkers.map(m => [m]);
 
   // markerGroups 생성 직후
   console.log('markerGroups:', markerGroups);
