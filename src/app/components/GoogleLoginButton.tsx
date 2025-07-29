@@ -1,4 +1,5 @@
 import { signInWithGoogle } from '../lib/firebase';
+import apiClient from '../lib/apiClient';
 
 export default function GoogleLoginButton({ onLogin }: { onLogin?: (user: any) => void }) {
   return (
@@ -10,23 +11,23 @@ export default function GoogleLoginButton({ onLogin }: { onLogin?: (user: any) =
           console.log('id_token:', idToken);
 
           // 백엔드로 전송
-          const res = await fetch('http://localhost:5500/api/auth/google-id-token', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              id_token: idToken,
-              nickname: user.displayName,
-              profile_image_url: user.photoURL,
-            }),
+          const res = await apiClient.post('/auth/google-id-token', {
+            id_token: idToken,
+            nickname: user.displayName,
+            profile_image_url: user.photoURL,
           });
-          const data = await res.json();
+          const data = res.data;
           console.log('백엔드 응답:', data);
 
           // 다양한 필드명 체크
           const token = data.accessToken ||  data.token;
           if (token) {
             localStorage.setItem('jwtToken', token);
-            alert('로그인 성공! 토큰 저장 완료');
+            
+            // localStorage 변경 이벤트 디스패치
+            window.dispatchEvent(new Event('localStorageChange'));
+            
+            // alert('로그인 성공! 토큰 저장 완료');
             // user 정보 우선순위: data.member > data.googlePayload > user
             const userInfo = (data.data && (data.data.member || data.data.googlePayload)) || user;
             if (onLogin) onLogin(userInfo);

@@ -90,6 +90,56 @@ export default function GoogleMapClient() {
   // 상세 모달 관련 state 추가
   const [multiMarkers, setMultiMarkers] = useState<MarkerData[]>([]);
   const [multiMarkerIndex, setMultiMarkerIndex] = useState(0);
+  // 인증 상태 관리
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  // 로그인 상태 확인
+  useEffect(() => {
+    const checkLoginStatus = () => {
+      const token = localStorage.getItem('jwtToken');
+      const loggedIn = !!token;
+      setIsLoggedIn(loggedIn);
+      
+      // 로그아웃된 경우 내 마커만 보기 해제
+      if (!loggedIn && showMyMarkers) {
+        setShowMyMarkers(false);
+        // 지도 새로고침
+        if (mapRef.current) {
+          const bounds = mapRef.current.getBounds();
+          if (bounds) {
+            fetchClusters(bounds, false);
+          }
+        }
+      }
+    };
+
+    // 초기 로그인 상태 확인
+    checkLoginStatus();
+
+    // localStorage 변경 감지
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'jwtToken') {
+        checkLoginStatus();
+      }
+    };
+
+    // 같은 탭에서의 localStorage 변경 감지
+    const handleStorageChangeLocal = () => {
+      checkLoginStatus();
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('localStorageChange', handleStorageChangeLocal);
+
+    // 주기적으로 로그인 상태 확인 (다른 탭에서 로그아웃한 경우 대비)
+    const interval = setInterval(checkLoginStatus, 5000);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('localStorageChange', handleStorageChangeLocal);
+      clearInterval(interval);
+    };
+  }, [showMyMarkers]);
 
   // 감성태그 입력 핸들러
   const handleEmotionInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -810,22 +860,25 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
           >
             +
           </button> */}
-          <button
-            className={`px-3 py-1 rounded-full shadow text-sm font-semibold border transition-colors duration-150 ${showMyMarkers ? 'bg-blue-500 text-white border-blue-500' : 'bg-white text-blue-500 border-blue-300 hover:bg-blue-50'}`}
-            onClick={() => {
-              setShowMyMarkers((prev) => {
-                const next = !prev;
-                // 토글 시 즉시 fetch
-                if (mapRef.current) {
-                  const bounds = mapRef.current.getBounds();
-                  fetchClusters(bounds ?? null, !prev);
-                }
-                return next;
-              });
-            }}
-          >
-            {showMyMarkers ? '내 마커만 보기 해제' : '내 마커만 보기'}
-          </button>
+          {/* 로그인된 경우에만 내 마커만 보기 버튼 표시 */}
+          {isLoggedIn && (
+            <button
+              className={`px-3 py-1 rounded-full shadow text-sm font-semibold border transition-colors duration-150 ${showMyMarkers ? 'bg-blue-500 text-white border-blue-500' : 'bg-white text-blue-500 border-blue-300 hover:bg-blue-50'}`}
+              onClick={() => {
+                setShowMyMarkers((prev) => {
+                  const next = !prev;
+                  // 토글 시 즉시 fetch
+                  if (mapRef.current) {
+                    const bounds = mapRef.current.getBounds();
+                    fetchClusters(bounds ?? null, !prev);
+                  }
+                  return next;
+                });
+              }}
+            >
+              {showMyMarkers ? '내 마커만 보기 해제' : '내 마커만 보기'}
+            </button>
+          )}
         </div>
         {/* 검색창 */}
         <div className="absolute top-20 left-4 right-4 z-10">
@@ -1016,6 +1069,7 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                     />
                     {group.length > 1 && (
                       <OverlayView
+                        key={mainMarker.id + '-overlay'}
                         position={{ lat: mainMarker.latitude, lng: mainMarker.longitude }}
                         mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
                       >

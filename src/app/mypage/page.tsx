@@ -35,6 +35,9 @@ export default function MyPage() {
       // JWT 토큰을 localStorage에 저장
       localStorage.setItem('jwtToken', token);
       
+      // localStorage 변경 이벤트 디스패치
+      window.dispatchEvent(new Event('localStorageChange'));
+      
       setIsLoggedIn(true);
       setUser(userData);
       setLoginForm({ email: '', password: '' });
@@ -51,6 +54,10 @@ export default function MyPage() {
   // 로그아웃
   const handleLogout = () => {
     localStorage.removeItem('jwtToken');
+    
+    // localStorage 변경 이벤트 디스패치
+    window.dispatchEvent(new Event('localStorageChange'));
+    
     setIsLoggedIn(false);
     setUser(null);
     setError('');
