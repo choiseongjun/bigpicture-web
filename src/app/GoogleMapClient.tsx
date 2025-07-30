@@ -9,10 +9,35 @@ const containerStyle = {
   height: '400px',
 };
 
-const center = {
+const defaultCenter = {
   lat: 37.5665,
   lng: 126.9780,
 };
+
+// 감정 데이터 정의
+const emotions = [
+  { id: 'happy', emoji: '😊', name: '행복', nameEn: 'Happy' },
+  { id: 'sad', emoji: '😢', name: '슬픔', nameEn: 'Sad' },
+  { id: 'angry', emoji: '😡', name: '분노', nameEn: 'Angry' },
+  { id: 'fear', emoji: '😨', name: '두려움', nameEn: 'Fear' },
+  { id: 'surprise', emoji: '😮', name: '놀람', nameEn: 'Surprise' },
+  { id: 'peaceful', emoji: '😌', name: '평온', nameEn: 'Peaceful' },
+  { id: 'love', emoji: '💕', name: '사랑', nameEn: 'Love' },
+  { id: 'celebration', emoji: '🎉', name: '축하', nameEn: 'Celebration' },
+  { id: 'achievement', emoji: '💪', name: '성취감', nameEn: 'Achievement' },
+  { id: 'inspiration', emoji: '🎨', name: '영감', nameEn: 'Inspiration' },
+  { id: 'delicious', emoji: '🍜', name: '맛있음', nameEn: 'Delicious' },
+  { id: 'music', emoji: '🎵', name: '음악', nameEn: 'Music' },
+  { id: 'beauty', emoji: '🌸', name: '아름다움', nameEn: 'Beauty' },
+  { id: 'memory', emoji: '💭', name: '추억', nameEn: 'Memory' },
+  { id: 'energy', emoji: '🏃‍♂️', name: '활력', nameEn: 'Energy' },
+  { id: 'tired', emoji: '😴', name: '피곤함', nameEn: 'Tired' },
+  { id: 'lonely', emoji: '🪞', name: '외로움', nameEn: 'Lonely' },
+  { id: 'nostalgic', emoji: '📷', name: '그리움', nameEn: 'Nostalgic' },
+  { id: 'anxious', emoji: '😬', name: '불안함', nameEn: 'Anxious' },
+  { id: 'grateful', emoji: '🙏', name: '감사함', nameEn: 'Grateful' },
+  { id: 'hopeful', emoji: '🌤️', name: '희망', nameEn: 'Hopeful' }
+];
 
 interface MarkerData {
   id: number;
@@ -75,8 +100,8 @@ export default function GoogleMapClient() {
   const [isThumbnailUploading, setIsThumbnailUploading] = useState(false);
   const [isDetailUploading, setIsDetailUploading] = useState(false);
   const [description, setDescription] = useState('');
-  const [emotionInput, setEmotionInput] = useState('');
-  const [emotionTags, setEmotionTags] = useState<string[]>([]);
+  const [selectedEmotions, setSelectedEmotions] = useState<string[]>([]);
+  const [shareSetting, setShareSetting] = useState<'public' | 'friends' | 'private'>('public');
   const [imageViewerOpen, setImageViewerOpen] = useState(false);
   const [imageViewerImages, setImageViewerImages] = useState<string[]>([]);
   const [imageViewerIndex, setImageViewerIndex] = useState(0);
@@ -96,6 +121,10 @@ export default function GoogleMapClient() {
   
   // 좋아요 로딩 상태 관리
   const [likeLoading, setLikeLoading] = useState<Set<number>>(new Set());
+  
+  // 위치 기반 로딩 상태 관리
+  const [currentCenter, setCurrentCenter] = useState(defaultCenter);
+  const [isLocationLoading, setIsLocationLoading] = useState(true);
 
   // 좋아요 토글 함수
   const handleLikeToggle = async (markerId: number) => {
@@ -142,6 +171,47 @@ export default function GoogleMapClient() {
       });
     }
   };
+
+  // 위치 기반 초기화
+  useEffect(() => {
+    const initializeLocation = () => {
+      if (!navigator.geolocation) {
+        console.log('이 브라우저에서는 위치 정보가 지원되지 않습니다.');
+        setIsLocationLoading(false);
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          console.log('현재 위치 가져오기 성공:', { latitude, longitude });
+          setCurrentCenter({ lat: latitude, lng: longitude });
+          setMyLocation({ lat: latitude, lng: longitude });
+          setIsLocationLoading(false);
+        },
+        (error) => {
+          console.log('위치 정보를 가져오지 못했습니다:', error.message);
+          setIsLocationLoading(false);
+        },
+        { 
+          enableHighAccuracy: true, 
+          maximumAge: 60000, // 1분 캐시
+          timeout: 10000 
+        }
+      );
+    };
+
+    initializeLocation();
+  }, []);
+
+  // 위치가 업데이트되면 지도 중심 이동
+  useEffect(() => {
+    if (myLocation && mapRef.current && !hasCentered) {
+      mapRef.current.setCenter(myLocation);
+      mapRef.current.setZoom(16);
+      setHasCentered(true);
+    }
+  }, [myLocation, hasCentered]);
 
   // 로그인 상태 확인
   useEffect(() => {
@@ -191,21 +261,17 @@ export default function GoogleMapClient() {
     };
   }, [showMyMarkers]);
 
-  // 감성태그 입력 핸들러
-  const handleEmotionInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && emotionInput.trim()) {
-      e.preventDefault();
-      if (!emotionTags.includes(emotionInput.trim())) {
-        setEmotionTags([...emotionTags, emotionInput.trim()]);
-      }
-      setEmotionInput('');
-    }
+  // 감정 선택 핸들러
+  const handleEmotionToggle = (emotionId: string) => {
+    setSelectedEmotions(prev => 
+      prev.includes(emotionId) 
+        ? prev.filter(id => id !== emotionId)
+        : [...prev, emotionId]
+    );
   };
-  const handleEmotionInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setEmotionInput(e.target.value);
-  };
-  const handleRemoveEmotionTag = (tag: string) => {
-    setEmotionTags(emotionTags.filter(t => t !== tag));
+
+  const handleRemoveEmotion = (emotionId: string) => {
+    setSelectedEmotions(prev => prev.filter(id => id !== emotionId));
   };
 
   // 저장 버튼 클릭 핸들러
@@ -215,8 +281,8 @@ export default function GoogleMapClient() {
       alert('설명을 입력하세요.');
       return;
     }
-    if (emotionTags.length === 0) {
-      alert('감성태그를 1개 이상 입력하세요.');
+    if (selectedEmotions.length === 0) {
+      alert('감정을 1개 이상 선택하세요.');
       return;
     }
     if (!thumbnailUrl) {
@@ -230,8 +296,9 @@ export default function GoogleMapClient() {
     const markerData = {
       latitude: latitude,
       longitude: longitude,
-      emotion_tag: emotionTags.join(','), // 문자열로 전송
+      emotion_tag: selectedEmotions.join(','), // 선택된 감정들을 문자열로 전송
       description: description.trim(),
+      share_setting: shareSetting, // 공유 설정 추가
       thumbnail_img: thumbnailImage.replace('https://bigpicture-jun-dev.s3.ap-northeast-2.amazonaws.com', ''),
       images: [
         {
@@ -255,7 +322,8 @@ export default function GoogleMapClient() {
       setShowPlaceModal(false);
       setPlacedMarker(null);
       setDescription('');
-      setEmotionTags([]);
+      setSelectedEmotions([]);
+      setShareSetting('public'); // 공유 설정 초기화
       setThumbnailFile(null);
       setThumbnailPreview(null);
       setThumbnailUrl(null);
@@ -544,6 +612,13 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
     mapRef.current = map;
     setMapLoaded(true);
     
+    // 위치가 로드되었고 현재 위치로 설정된 경우, 지도를 현재 위치로 이동
+    if (myLocation && !hasCentered) {
+      map.setCenter(myLocation);
+      map.setZoom(16);
+      setHasCentered(true);
+    }
+    
     // 초기 마커 로드
     const bounds = map.getBounds();
     if (bounds) {
@@ -752,7 +827,7 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
     setShowPlaceModal(false);
     setShowPlaceInfoWindow(false);
     setDescription('');
-    setEmotionTags([]);
+    setSelectedEmotions([]);
     setThumbnailFile(null);
     setThumbnailPreview(null);
     setThumbnailUrl(null);
@@ -975,7 +1050,7 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
 
         <GoogleMap
           mapContainerStyle={{ width: '100%', height: '100%' }}
-          center={center}
+          center={currentCenter}
           zoom={14}
           onLoad={onMapLoad}
           onBoundsChanged={handleBoundsChanged}
@@ -1000,6 +1075,16 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
           {isClusterLoading && (
             <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/20 pointer-events-none">
               <div className="w-12 h-12 border-4 border-blue-400 border-t-transparent rounded-full animate-spin" />
+            </div>
+          )}
+          
+          {/* 위치 로딩 중 표시 */}
+          {isLocationLoading && (
+            <div className="absolute inset-0 z-50 flex items-center justify-center bg-white/80 pointer-events-none">
+              <div className="bg-white rounded-lg shadow-lg p-4 flex flex-col items-center">
+                <div className="w-8 h-8 border-4 border-blue-400 border-t-transparent rounded-full animate-spin mb-2" />
+                <p className="text-sm text-gray-600">현재 위치를 가져오는 중...</p>
+              </div>
             </div>
           )}
         
@@ -1321,23 +1406,50 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                 onChange={e => setDescription(e.target.value)}
               />
 
-              {/* 감성태그 입력 */}
+              {/* 감정 선택 */}
               <div className="mb-4">
-                <div className="flex gap-2 flex-wrap mb-2">
-                  {emotionTags.map(tag => (
-                    <span key={tag} className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm mr-2 mb-2">
-                      {tag}
-                      <button type="button" className="ml-2 text-blue-400 hover:text-blue-700" onClick={() => handleRemoveEmotionTag(tag)}>&times;</button>
-                    </span>
+                <span className="block text-sm font-medium text-gray-700 mb-3">감정 선택</span>
+                
+                {/* 선택된 감정들 표시 */}
+                {selectedEmotions.length > 0 && (
+                  <div className="flex gap-2 flex-wrap mb-3">
+                    {selectedEmotions.map(emotionId => {
+                      const emotion = emotions.find(e => e.id === emotionId);
+                      return emotion ? (
+                        <span key={emotionId} className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">
+                          <span className="mr-1">{emotion.emoji}</span>
+                          {emotion.name}
+                          <button 
+                            type="button" 
+                            className="ml-2 text-blue-400 hover:text-blue-700" 
+                            onClick={() => handleRemoveEmotion(emotionId)}
+                          >
+                            &times;
+                          </button>
+                        </span>
+                      ) : null;
+                    })}
+                  </div>
+                )}
+                
+                {/* 감정 선택 그리드 */}
+                <div className="grid grid-cols-4 gap-2">
+                  {emotions.map(emotion => (
+                    <button
+                      key={emotion.id}
+                      type="button"
+                      onClick={() => handleEmotionToggle(emotion.id)}
+                      className={`p-3 rounded-lg border-2 transition-all duration-200 flex flex-col items-center ${
+                        selectedEmotions.includes(emotion.id)
+                          ? 'border-blue-500 bg-blue-50 text-blue-700'
+                          : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50 text-gray-700'
+                      }`}
+                    >
+                      <span className="text-2xl mb-1">{emotion.emoji}</span>
+                      <span className="text-xs font-medium">{emotion.name}</span>
+                    </button>
                   ))}
                 </div>
-                <input
-                  className="w-full border rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition text-black"
-                  placeholder="감성태그 입력 후 엔터 (예: 재미, 흥미, 열정)"
-                  value={emotionInput}
-                  onChange={handleEmotionInputChange}
-                  onKeyDown={handleEmotionInputKeyDown}
-                />
               </div>
               
               {/* 썸네일 이미지 업로드 */}
@@ -1375,6 +1487,78 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                   </div>
                 </div>
               )}
+
+              {/* 공유 설정 */}
+              <div className="mb-4">
+                <span className="block text-sm font-medium text-gray-700 mb-3">공유 설정</span>
+                <div className="space-y-3">
+                  <label className="flex items-center p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+                    <input
+                      type="radio"
+                      name="shareSetting"
+                      value="public"
+                      checked={shareSetting === 'public'}
+                      onChange={(e) => setShareSetting(e.target.value as 'public' | 'friends' | 'private')}
+                      className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-2"
+                    />
+                    <div className="ml-3 flex items-center">
+                      <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center mr-3">
+                        <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9v9" />
+                        </svg>
+                      </div>
+                      <div>
+                        <div className="text-sm font-medium text-gray-900">전체공유</div>
+                        <div className="text-xs text-gray-500">모든 사용자가 볼 수 있습니다</div>
+                      </div>
+                    </div>
+                  </label>
+
+                  <label className="flex items-center p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+                    <input
+                      type="radio"
+                      name="shareSetting"
+                      value="friends"
+                      checked={shareSetting === 'friends'}
+                      onChange={(e) => setShareSetting(e.target.value as 'public' | 'friends' | 'private')}
+                      className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-2"
+                    />
+                    <div className="ml-3 flex items-center">
+                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
+                        <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <div className="text-sm font-medium text-gray-900">친구에게만 공유</div>
+                        <div className="text-xs text-gray-500">친구 목록에 있는 사용자만 볼 수 있습니다</div>
+                      </div>
+                    </div>
+                  </label>
+
+                  <label className="flex items-center p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+                    <input
+                      type="radio"
+                      name="shareSetting"
+                      value="private"
+                      checked={shareSetting === 'private'}
+                      onChange={(e) => setShareSetting(e.target.value as 'public' | 'friends' | 'private')}
+                      className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-2"
+                    />
+                    <div className="ml-3 flex items-center">
+                      <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center mr-3">
+                        <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <div className="text-sm font-medium text-gray-900">나만 보기</div>
+                        <div className="text-xs text-gray-500">나만 볼 수 있습니다</div>
+                      </div>
+                    </div>
+                  </label>
+                </div>
+              </div>
             </div>
             
             {/* 버튼 영역 (고정) */}

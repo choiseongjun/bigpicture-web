@@ -1,13 +1,13 @@
 "use client";
-import { LanguageProvider } from "./components/LanguageContext";
 import GoogleMapsProvider from "./components/GoogleMapsProvider";
+import I18nProvider from "./components/I18nProvider";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <LanguageProvider>
+    <I18nProvider locale="ko">
       <GoogleMapsProvider>
         {children}
       </GoogleMapsProvider>
-    </LanguageProvider>
+    </I18nProvider>
   );
 } 

@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslation } from 'next-i18next';
 
@@ -9,13 +9,27 @@ export default function Header() {
   const { t, i18n } = useTranslation('common');
   const router = useRouter();
   
-  const handleLangSelect = (l: 'ko' | 'en') => {
+  // 초기 언어 설정
+  useEffect(() => {
+    const savedLanguage = localStorage.getItem('language');
+    if (savedLanguage && savedLanguage !== i18n.language) {
+      i18n.changeLanguage(savedLanguage);
+    }
+  }, [i18n]);
+  
+  const handleLangSelect = async (l: 'ko' | 'en') => {
     setLangModalOpen(false);
-    const currentPath = window.location.pathname;
-    const pathWithoutLocale = currentPath.replace(/^\/(ko|en)/, '') || '/';
-    const newPath = `/${l}${pathWithoutLocale}`;
-    router.push(newPath);
+    
+    // localStorage에 언어 설정 저장
+    localStorage.setItem('language', l);
+    
+    // 언어 변경
+    await i18n.changeLanguage(l);
+    
+    // 언어 변경 이벤트 발생
+    window.dispatchEvent(new CustomEvent('languageChanged', { detail: l }));
   };
+  
   return (
     <header className="fixed top-0 left-0 w-full h-14 border-b bg-white shadow-sm z-20 flex items-center justify-center">
       <div className="absolute left-4 flex items-center gap-2">
@@ -53,16 +67,16 @@ export default function Header() {
       <div className="text-xl font-bold text-gray-900">BigPicture</div>
       {/* <div className="absolute right-4 flex items-center gap-4">
         <Link href="/ranking" className="flex items-center gap-1 text-gray-600 hover:text-blue-600 transition font-medium">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2zm0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
           <span className="hidden sm:inline">랭킹</span>
         </Link>
         <Link href="/community" className="flex items-center gap-1 text-gray-600 hover:text-blue-600 transition font-medium">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8h2a2 2 0 012 2v8a2 2 0 01-2 2H7a2 2 0 01-2-2V10a2 2 0 012-2h2m4-4v4m0 0l-2-2m2 2l2-2"/></svg>
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8h2a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2zm0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
           <span className="hidden sm:inline">커뮤니티</span>
         </Link>
         <Link href="/mypage" className="flex items-center gap-1 text-gray-600 hover:text-blue-600 transition font-medium">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
-          <span className="hidden sm:inline">마이</span>
+          <span className="text-sm">{t('mypage')}</span>
         </Link>
       </div> */}
     </header>
