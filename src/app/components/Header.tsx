@@ -1,17 +1,20 @@
 "use client";
 import Link from "next/link";
 import { useState } from "react";
-import { useLanguage } from "./LanguageContext";
 import { useRouter } from "next/navigation";
+import { useTranslation } from 'next-i18next';
 
 export default function Header() {
   const [langModalOpen, setLangModalOpen] = useState(false);
-  const { lang } = useLanguage();
+  const { t, i18n } = useTranslation('common');
   const router = useRouter();
+  
   const handleLangSelect = (l: 'ko' | 'en') => {
     setLangModalOpen(false);
-    if (l === 'en') router.push('/en');
-    else router.push('/ko');
+    const currentPath = window.location.pathname;
+    const pathWithoutLocale = currentPath.replace(/^\/(ko|en)/, '') || '/';
+    const newPath = `/${l}${pathWithoutLocale}`;
+    router.push(newPath);
   };
   return (
     <header className="fixed top-0 left-0 w-full h-14 border-b bg-white shadow-sm z-20 flex items-center justify-center">
@@ -26,22 +29,22 @@ export default function Header() {
             <ellipse cx="12" cy="12" rx="5" ry="10" stroke="#2563EB" strokeWidth="1.5" fill="none"/>
             <ellipse cx="12" cy="12" rx="10" ry="5" stroke="#2563EB" strokeWidth="1.5" fill="none"/>
           </svg>
-          <span className="text-sm">{lang === 'ko' ? '한국어' : 'English'}</span>
+          <span className="text-sm">{i18n.language === 'ko' ? t('korean') : t('english')}</span>
         </button>
         {langModalOpen && (
           <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/30" onClick={() => setLangModalOpen(false)}>
             <div className="bg-white rounded-2xl shadow-lg p-6 min-w-[220px] flex flex-col gap-3" onClick={e => e.stopPropagation()}>
               <button
-                className={`py-2 rounded text-lg font-semibold ${lang === 'ko' ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100 text-gray-700'}`}
+                className={`py-2 rounded text-lg font-semibold ${i18n.language === 'ko' ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100 text-gray-700'}`}
                 onClick={() => handleLangSelect('ko')}
               >
-                한국어
+                {t('korean')}
               </button>
               <button
-                className={`py-2 rounded text-lg font-semibold ${lang === 'en' ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100 text-gray-700'}`}
+                className={`py-2 rounded text-lg font-semibold ${i18n.language === 'en' ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100 text-gray-700'}`}
                 onClick={() => handleLangSelect('en')}
               >
-                English
+                {t('english')}
               </button>
             </div>
           </div>
