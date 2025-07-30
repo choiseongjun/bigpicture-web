@@ -1007,7 +1007,7 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
         <MarkerClusterer options={getClustererOptions()}>
           {(clusterer) => (
             <>
-              {/* {!isPlacingMarker && clusters.map((cluster) => {
+              {!isPlacingMarker && clusters.map((cluster) => {
                 if (cluster.count === 1 && cluster.markers && cluster.markers.length > 1) {
                   // 동일 위치에 여러 마커가 겹친 경우
                   const markerGroup = cluster.markers;
@@ -1056,13 +1056,15 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                   const marker = cluster.markers[0];
                   const icon = createCustomMarkerIcon(marker.thumbnailImg);
                   return (
-                    <Marker
+                   <>
+                    {/* <Marker
                       key={cluster.h3_index}
                       position={{ lat: marker.latitude, lng: marker.longitude }}
                       icon={icon}
                       onClick={() => setSelectedMarker(marker)}
                       options={{ clickable: true, cursor: 'pointer' }}
-                    />
+                    /> */}
+                   </>
                   );
                 } else {
                   return (
@@ -1094,7 +1096,7 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                     />
                   );
                 }
-              })} */}
+              })}
 
               {!isPlacingMarker && markerGroups.map((group, idx) => {
                 if (!group) return null;
