@@ -1020,7 +1020,10 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
     imageUrls.push(...detailImages);
     
     setDetailModalImages(imageUrls.filter(Boolean));
-    setDetailModalIndex(0);
+    
+    // multiMarkers에서 현재 마커의 인덱스 찾기
+    const markerIndex = multiMarkers.findIndex(m => m.id === marker.id);
+    setDetailModalIndex(markerIndex >= 0 ? markerIndex : 0);
     
     // 조회수 증가 API 호출 및 최신 데이터로 업데이트
     incrementViewCount(marker.id);
@@ -1696,7 +1699,7 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                     imageUrls.push(...detailImages);
                     
                     setDetailModalImages(imageUrls.filter(Boolean));
-                    setDetailModalIndex(0);
+                    setDetailModalIndex(multiMarkerIndex);
                     
                     // 조회수 증가 API 호출 및 최신 데이터로 업데이트
                     incrementViewCount(multiMarkers[multiMarkerIndex].id);
@@ -1981,6 +1984,37 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
         <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/70">
           <div className="relative bg-white rounded-3xl shadow-2xl max-w-lg w-full flex flex-col overflow-hidden border border-blue-100">
             <button className="absolute top-4 right-4 text-3xl text-blue-400 hover:text-blue-700 z-10 bg-white rounded-full shadow p-2 transition" onClick={() => setDetailModalOpen(false)}>&times;</button>
+            
+            {/* 네비게이션 컨트롤 - 여러 마커가 있을 때만 표시 */}
+            {multiMarkers.length > 1 && (
+              <div className="absolute top-4 left-4 z-10 flex items-center gap-2 bg-white rounded-full shadow p-2">
+                <button
+                  className="text-lg px-2 py-1 rounded text-black hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={() => {
+                    const newIndex = Math.max(0, detailModalIndex - 1);
+                    setDetailModalIndex(newIndex);
+                    setDetailModalMarker(multiMarkers[newIndex]);
+                  }}
+                  disabled={detailModalIndex === 0}
+                >
+                  ◀
+                </button>
+                <span className="text-sm text-gray-500 px-2">
+                  {detailModalIndex + 1} / {multiMarkers.length}
+                </span>
+                <button
+                  className="text-lg px-2 py-1 rounded hover:bg-gray-100 text-black disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={() => {
+                    const newIndex = Math.min(multiMarkers.length - 1, detailModalIndex + 1);
+                    setDetailModalIndex(newIndex);
+                    setDetailModalMarker(multiMarkers[newIndex]);
+                  }}
+                  disabled={detailModalIndex === multiMarkers.length - 1}
+                >
+                  ▶
+                </button>
+              </div>
+            )}
             {/* 이미지 섹션 */}
             <div className="bg-gradient-to-b from-blue-50 to-white p-6">
               {/* 썸네일 이미지 */}
