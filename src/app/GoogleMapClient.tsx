@@ -129,6 +129,30 @@ export default function GoogleMapClient() {
   const [currentCenter, setCurrentCenter] = useState(defaultCenter);
   const [isLocationLoading, setIsLocationLoading] = useState(true);
 
+  // 필터링 관련 상태 추가
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [filterSettings, setFilterSettings] = useState({
+    selectedEmotions: [] as string[],
+    dateRange: {
+      start: '',
+      end: ''
+    },
+    likesRange: {
+      min: 0,
+      max: 1000
+    },
+    viewsRange: {
+      min: 0,
+      max: 1000
+    },
+    authorFilter: '',
+    descriptionFilter: '',
+    emotionTagFilter: '',
+    sortBy: 'latest' as 'latest' | 'oldest' | 'likes' | 'views' | 'popular'
+  });
+  const [filteredMarkers, setFilteredMarkers] = useState<MarkerData[]>([]);
+  const [isFilterActive, setIsFilterActive] = useState(false);
+
   // 좋아요 토글 함수
   const handleLikeToggle = async (markerId: number) => {
     if (!isLoggedIn) {
@@ -1018,26 +1042,31 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
   // 마커 그룹핑: 20미터 이내 마커끼리 그룹핑
   function groupMarkersByDistance(markers: MarkerData[], threshold = 20) {
     const groups: MarkerData[][] = [];
-    const used = new Array(markers.length).fill(false);
-    for (let i = 0; i < markers.length; i++) {
-      if (used[i]) continue;
-      const group = [markers[i]];
-      used[i] = true;
-      for (let j = i + 1; j < markers.length; j++) {
-        if (used[j]) continue;
-        const d = getDistanceFromLatLonInMeters(
-          markers[i].latitude,
-          markers[i].longitude,
-          markers[j].latitude,
-          markers[j].longitude
+    const used = new Set<number>();
+
+    markers.forEach((marker, i) => {
+      if (used.has(i)) return;
+
+      const group = [marker];
+      used.add(i);
+
+      markers.forEach((otherMarker, j) => {
+        if (i === j || used.has(j)) return;
+
+        const distance = getDistanceFromLatLonInMeters(
+          marker.latitude, marker.longitude,
+          otherMarker.latitude, otherMarker.longitude
         );
-        if (d <= threshold) {
-          group.push(markers[j]);
-          used[j] = true;
+
+        if (distance <= threshold) {
+          group.push(otherMarker);
+          used.add(j);
         }
-      }
+      });
+
       groups.push(group);
-    }
+    });
+
     return groups;
   }
 
@@ -1064,20 +1093,184 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
       };
     });
   }
-  const markerGroups = currentZoom >= 15
-    ? groupMarkersByDistance(allMarkers, 30)
-    : allMarkers.map(m => [m]);
 
+  // 필터링된 마커 또는 원본 마커 사용
+  const displayMarkers = isFilterActive ? filteredMarkers : allMarkers;
+  
+  const markerGroups = currentZoom >= 15
+    ? groupMarkersByDistance(displayMarkers, 30)
+    : displayMarkers.map(m => [m]);
+  
   // markerGroups 생성 직후
   console.log('markerGroups:', markerGroups);
+
+  // 필터링 함수들
+  const applyFilters = useCallback(() => {
+    // 모든 마커 데이터를 가져오기 위해 clusters에서 추출
+    let allMarkersData = clusters.flatMap(cluster => cluster.markers || []);
+    let filtered = [...allMarkersData];
+
+    // 감정 필터
+    if (filterSettings.selectedEmotions.length > 0) {
+      filtered = filtered.filter(marker => {
+        if (!marker.emotion) return false;
+        const markerEmotions = marker.emotion.split(',').map(e => e.trim());
+        return filterSettings.selectedEmotions.some(selected => 
+          markerEmotions.includes(selected)
+        );
+      });
+    }
+
+    // 날짜 범위 필터
+    if (filterSettings.dateRange.start || filterSettings.dateRange.end) {
+      filtered = filtered.filter(marker => {
+        const markerDate = new Date(marker.createdAt);
+        const startDate = filterSettings.dateRange.start ? new Date(filterSettings.dateRange.start) : null;
+        const endDate = filterSettings.dateRange.end ? new Date(filterSettings.dateRange.end) : null;
+
+        if (startDate && markerDate < startDate) return false;
+        if (endDate && markerDate > endDate) return false;
+        return true;
+      });
+    }
+
+    // 좋아요 범위 필터
+    filtered = filtered.filter(marker => 
+      marker.likes >= filterSettings.likesRange.min && 
+      marker.likes <= filterSettings.likesRange.max
+    );
+
+    // 조회수 범위 필터
+    filtered = filtered.filter(marker => 
+      marker.views >= filterSettings.viewsRange.min && 
+      marker.views <= filterSettings.viewsRange.max
+    );
+
+    // 작성자 필터
+    if (filterSettings.authorFilter) {
+      filtered = filtered.filter(marker =>
+        marker.author.toLowerCase().includes(filterSettings.authorFilter.toLowerCase())
+      );
+    }
+
+    // 설명 필터
+    if (filterSettings.descriptionFilter) {
+      filtered = filtered.filter(marker =>
+        marker.description.toLowerCase().includes(filterSettings.descriptionFilter.toLowerCase())
+      );
+    }
+
+    // 감성태그 필터
+    if (filterSettings.emotionTagFilter) {
+      filtered = filtered.filter(marker =>
+        marker.emotionTag.toLowerCase().includes(filterSettings.emotionTagFilter.toLowerCase())
+      );
+    }
+
+    // 정렬
+    filtered.sort((a, b) => {
+      switch (filterSettings.sortBy) {
+        case 'latest':
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        case 'oldest':
+          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        case 'likes':
+          return b.likes - a.likes;
+        case 'views':
+          return b.views - a.views;
+        case 'popular':
+          return (b.likes + b.views) - (a.likes + a.views);
+        default:
+          return 0;
+      }
+    });
+
+    setFilteredMarkers(filtered);
+    setIsFilterActive(true);
+  }, [clusters, filterSettings]);
+
+  const clearFilters = () => {
+    setFilterSettings({
+      selectedEmotions: [],
+      dateRange: { start: '', end: '' },
+      likesRange: { min: 0, max: 1000 },
+      viewsRange: { min: 0, max: 1000 },
+      authorFilter: '',
+      descriptionFilter: '',
+      emotionTagFilter: '',
+      sortBy: 'latest'
+    });
+    setFilteredMarkers([]);
+    setIsFilterActive(false);
+  };
+
+  const handleFilterEmotionToggle = (emotionId: string) => {
+    setFilterSettings(prev => ({
+      ...prev,
+      selectedEmotions: prev.selectedEmotions.includes(emotionId)
+        ? prev.selectedEmotions.filter(id => id !== emotionId)
+        : [...prev.selectedEmotions, emotionId]
+    }));
+  };
+
+  // 필터 적용 시 markers 업데이트
+  useEffect(() => {
+    if (isFilterActive) {
+      applyFilters();
+    }
+  }, [filterSettings, clusters, isFilterActive, applyFilters]);
+
+  // Escape 키로 필터 모달 닫기
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && showFilterModal) {
+        setShowFilterModal(false);
+      }
+    };
+
+    if (showFilterModal) {
+      document.addEventListener('keydown', handleEscape);
+      return () => document.removeEventListener('keydown', handleEscape);
+    }
+  }, [showFilterModal]);
 
   return (
     <div className="w-full h-full absolute inset-0">
         {/* 지도 위 필터 바 */}
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex gap-2 bg-white rounded-full shadow px-4 py-2 border border-gray-200">
-          <button className="text-sm font-medium text-blue-600 px-3 py-1 rounded-full bg-blue-50 hover:bg-blue-100">전체</button>
-          <button className="text-sm font-medium text-gray-600 px-3 py-1 rounded-full hover:bg-gray-100">감정</button>
-          <button className="text-sm font-medium text-gray-600 px-3 py-1 rounded-full hover:bg-gray-100">카테고리</button>
+          <button 
+            className={`text-sm font-medium px-3 py-1 rounded-full transition-colors ${
+              !isFilterActive 
+                ? 'text-blue-600 bg-blue-50' 
+                : 'text-gray-600 hover:bg-gray-100'
+            }`}
+            onClick={clearFilters}
+          >
+            전체 {!isFilterActive && `(${clusters.flatMap(cluster => cluster.markers || []).length}개)`}
+          </button>
+          <button 
+            className={`text-sm font-medium px-3 py-1 rounded-full transition-colors ${
+              filterSettings.selectedEmotions.length > 0 
+                ? 'text-blue-600 bg-blue-50' 
+                : 'text-gray-600 hover:bg-gray-100'
+            }`}
+            onClick={() => setShowFilterModal(true)}
+          >
+            필터 {filterSettings.selectedEmotions.length > 0 && `(${filterSettings.selectedEmotions.length})`}
+          </button>
+          {isFilterActive && (
+            <>
+              <span className="text-sm text-gray-600 px-3 py-1">
+                {filteredMarkers.length}개 표시
+              </span>
+              <button 
+                className="text-sm font-medium text-red-600 px-3 py-1 rounded-full bg-red-50 hover:bg-red-100"
+                onClick={clearFilters}
+              >
+                필터 해제
+              </button>
+            </>
+          )}
         </div>
         {/* 지도 하단 확대/축소/내위치 버튼 */}
         <div className="absolute bottom-32 right-4 z-30 flex flex-col gap-2 items-center">
@@ -1923,6 +2116,236 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                   </span>
                 </span>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 필터 모달 */}
+            {showFilterModal && (
+              <div
+                className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+                onClick={(e) => {
+                  if (e.target === e.currentTarget) {
+                    setShowFilterModal(false);
+                  }
+                }}
+              >
+            <div className="bg-white bg-opacity-20 backdrop-blur-md rounded-2xl shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            {/* 헤더 */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <h2 className="text-2xl font-bold text-gray-800">마커 필터</h2>
+              <button
+                onClick={() => setShowFilterModal(false)}
+                className="text-gray-500 hover:text-gray-700 text-2xl"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* 필터 내용 */}
+            <div className="p-6 space-y-6">
+              {/* 감정 필터 */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800 mb-3">감정 선택</h3>
+                <div className="grid grid-cols-4 gap-2">
+                  {emotions.map((emotion) => (
+                    <button
+                      key={emotion.id}
+                      onClick={() => handleFilterEmotionToggle(emotion.id)}
+                      className={`p-3 rounded-lg border-2 transition-all duration-200 ${
+                        filterSettings.selectedEmotions.includes(emotion.id)
+                          ? 'border-blue-500 bg-blue-50 text-blue-700'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="text-2xl mb-1">{emotion.emoji}</div>
+                      <div className="text-xs font-medium">{emotion.name}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 날짜 범위 필터 */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800 mb-3">날짜 범위</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">시작일</label>
+                    <input
+                      type="date"
+                      value={filterSettings.dateRange.start}
+                      onChange={(e) => setFilterSettings(prev => ({
+                        ...prev,
+                        dateRange: { ...prev.dateRange, start: e.target.value }
+                      }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">종료일</label>
+                    <input
+                      type="date"
+                      value={filterSettings.dateRange.end}
+                      onChange={(e) => setFilterSettings(prev => ({
+                        ...prev,
+                        dateRange: { ...prev.dateRange, end: e.target.value }
+                      }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* 좋아요 범위 필터 */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800 mb-3">좋아요 수 범위</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">최소</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={filterSettings.likesRange.min}
+                      onChange={(e) => setFilterSettings(prev => ({
+                        ...prev,
+                        likesRange: { ...prev.likesRange, min: parseInt(e.target.value) || 0 }
+                      }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">최대</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={filterSettings.likesRange.max}
+                      onChange={(e) => setFilterSettings(prev => ({
+                        ...prev,
+                        likesRange: { ...prev.likesRange, max: parseInt(e.target.value) || 1000 }
+                      }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* 조회수 범위 필터 */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800 mb-3">조회수 범위</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">최소</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={filterSettings.viewsRange.min}
+                      onChange={(e) => setFilterSettings(prev => ({
+                        ...prev,
+                        viewsRange: { ...prev.viewsRange, min: parseInt(e.target.value) || 0 }
+                      }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">최대</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={filterSettings.viewsRange.max}
+                      onChange={(e) => setFilterSettings(prev => ({
+                        ...prev,
+                        viewsRange: { ...prev.viewsRange, max: parseInt(e.target.value) || 1000 }
+                      }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* 텍스트 검색 필터 */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800 mb-3">텍스트 검색</h3>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">작성자</label>
+                    <input
+                      type="text"
+                      value={filterSettings.authorFilter}
+                      onChange={(e) => setFilterSettings(prev => ({
+                        ...prev,
+                        authorFilter: e.target.value
+                      }))}
+                      placeholder="작성자 이름으로 검색"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">설명</label>
+                    <input
+                      type="text"
+                      value={filterSettings.descriptionFilter}
+                      onChange={(e) => setFilterSettings(prev => ({
+                        ...prev,
+                        descriptionFilter: e.target.value
+                      }))}
+                      placeholder="설명 내용으로 검색"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">감성태그</label>
+                    <input
+                      type="text"
+                      value={filterSettings.emotionTagFilter}
+                      onChange={(e) => setFilterSettings(prev => ({
+                        ...prev,
+                        emotionTagFilter: e.target.value
+                      }))}
+                      placeholder="감성태그로 검색"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* 정렬 옵션 */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800 mb-3">정렬</h3>
+                <select
+                  value={filterSettings.sortBy}
+                  onChange={(e) => setFilterSettings(prev => ({
+                    ...prev,
+                    sortBy: e.target.value as 'latest' | 'oldest' | 'likes' | 'views' | 'popular'
+                  }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
+                >
+                  <option value="latest" className="text-black">최신순</option>
+                  <option value="oldest" className="text-black">오래된순</option>
+                  <option value="likes" className="text-black">좋아요순</option>
+                  <option value="views" className="text-black">조회수순</option>
+                  <option value="popular" className="text-black">인기순</option>
+                </select>
+              </div>
+            </div>
+
+            {/* 하단 버튼 */}
+            <div className="flex gap-3 p-6 border-t border-gray-200">
+              <button
+                onClick={clearFilters}
+                className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 font-medium"
+              >
+                필터 초기화
+              </button>
+              <button
+                onClick={() => {
+                  applyFilters();
+                  setShowFilterModal(false);
+                }}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+              >
+                필터 적용
+              </button>
             </div>
           </div>
         </div>
