@@ -45,5 +45,8 @@
   "register": "회원가입",
   "language": "언어",
   "korean": "한국어",
-  "english": "English"
+  "english": "English",
+  "emotionTag": "감정 태그",
+  "popular": "인기",
+  "latest": "최신"
 } 

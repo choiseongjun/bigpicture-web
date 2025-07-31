@@ -45,5 +45,8 @@
   "register": "Register",
   "language": "Language",
   "korean": "한국어",
-  "english": "English"
+  "english": "English",
+  "emotionTag": "Emotion Tag",
+  "popular": "Popular",
+  "latest": "Latest"
 } 

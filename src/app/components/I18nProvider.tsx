@@ -49,6 +49,7 @@ export default function I18nProvider({
   useEffect(() => {
     // localStorage에서 저장된 언어 설정 가져오기
     const savedLocale = localStorage.getItem('language') || locale
+    console.log('I18nProvider 초기화:', savedLocale)
     initI18next(savedLocale).then(setInstance)
   }, [locale])
 
@@ -57,18 +58,31 @@ export default function I18nProvider({
     const handleLanguageChange = async (event: Event) => {
       const customEvent = event as CustomEvent
       const newLocale = customEvent.detail
-      const newInstance = await initI18next(newLocale)
-      setInstance(newInstance)
+      console.log('언어 변경 감지:', newLocale)
+      
+      // 기존 인스턴스가 있으면 언어만 변경
+      if (instance) {
+        await instance.changeLanguage(newLocale)
+        setInstance({ ...instance }) // 강제 리렌더링
+      } else {
+        // 새 인스턴스 생성
+        const newInstance = await initI18next(newLocale)
+        setInstance(newInstance)
+      }
     }
 
     window.addEventListener('languageChanged', handleLanguageChange)
     return () => {
       window.removeEventListener('languageChanged', handleLanguageChange)
     }
-  }, [])
+  }, [instance])
 
   if (!instance) {
-    return null
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    )
   }
 
   return <I18nextProvider i18n={instance}>{children}</I18nextProvider>

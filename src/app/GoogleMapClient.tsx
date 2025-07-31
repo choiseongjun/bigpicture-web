@@ -100,6 +100,8 @@ export default function GoogleMapClient() {
   const [isThumbnailUploading, setIsThumbnailUploading] = useState(false);
   const [isDetailUploading, setIsDetailUploading] = useState(false);
   const [description, setDescription] = useState('');
+  const [emotionTag, setEmotionTag] = useState('');
+  const [emotionTags, setEmotionTags] = useState<string[]>([]);
   const [selectedEmotions, setSelectedEmotions] = useState<string[]>([]);
   const [shareSetting, setShareSetting] = useState<'public' | 'friends' | 'private'>('public');
   const [imageViewerOpen, setImageViewerOpen] = useState(false);
@@ -274,6 +276,28 @@ export default function GoogleMapClient() {
     setSelectedEmotions(prev => prev.filter(id => id !== emotionId));
   };
 
+  // 감성태그 추가 함수
+  const handleAddEmotionTag = () => {
+    const tag = emotionTag.trim();
+    if (tag && !emotionTags.includes(tag)) {
+      setEmotionTags(prev => [...prev, tag]);
+      setEmotionTag('');
+    }
+  };
+
+  // 감성태그 제거 함수
+  const handleRemoveEmotionTag = (tagToRemove: string) => {
+    setEmotionTags(prev => prev.filter(tag => tag !== tagToRemove));
+  };
+
+  // 감성태그 엔터키 처리 함수
+  const handleEmotionTagKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleAddEmotionTag();
+    }
+  };
+
   // 저장 버튼 클릭 핸들러
   const handleSaveMarker = async () => {
     if (!placedMarker) return;
@@ -296,7 +320,8 @@ export default function GoogleMapClient() {
     const markerData = {
       latitude: latitude,
       longitude: longitude,
-      emotion_tag: selectedEmotions.join(','), // 선택된 감정들을 문자열로 전송
+      emotion: selectedEmotions.join(','), // 선택된 감정들을 문자열로 전송
+      emotion_tag: emotionTags.join(','), // 사용자가 입력한 감성태그들
       description: description.trim(),
       share_setting: shareSetting, // 공유 설정 추가
       thumbnail_img: thumbnailImage.replace('https://bigpicture-jun-dev.s3.ap-northeast-2.amazonaws.com', ''),
@@ -322,6 +347,8 @@ export default function GoogleMapClient() {
       setShowPlaceModal(false);
       setPlacedMarker(null);
       setDescription('');
+      setEmotionTag('');
+      setEmotionTags([]);
       setSelectedEmotions([]);
       setShareSetting('public'); // 공유 설정 초기화
       setThumbnailFile(null);
@@ -1450,6 +1477,49 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                     </button>
                   ))}
                 </div>
+              </div>
+
+              {/* 감성태그 입력 */}
+              <div className="mb-4">
+                <span className="block text-sm font-medium text-gray-700 mb-2">감성태그</span>
+                <div className="flex gap-2 mb-2">
+                  <input
+                    type="text"
+                    className="flex-1 border rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition text-black"
+                    placeholder="감성태그를 입력하세요 (엔터로 추가)"
+                    value={emotionTag}
+                    onChange={e => setEmotionTag(e.target.value)}
+                    onKeyDown={handleEmotionTagKeyDown}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddEmotionTag}
+                    className="px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                  >
+                    추가
+                  </button>
+                </div>
+                {/* 입력된 태그들 표시 */}
+                {emotionTags.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {emotionTags.map((tag, index) => (
+                      <span
+                        key={index}
+                        className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm"
+                      >
+                        {tag}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveEmotionTag(tag)}
+                          className="ml-1 text-blue-600 hover:text-blue-800"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <div className="text-xs text-gray-500">엔터키를 누르거나 추가 버튼을 클릭하여 태그를 추가하세요</div>
               </div>
               
               {/* 썸네일 이미지 업로드 */}
