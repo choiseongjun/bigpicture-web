@@ -46,6 +46,7 @@ interface MarkerData {
   description: string;
   author: string;
   emotionTag: string;
+  emotion?: string; // 선택된 감정들 (predefined emotions)
   thumbnailImg: string;
   likes: number;
   views: number;
@@ -1709,12 +1710,47 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                   {new Date(detailModalMarker.createdAt).toLocaleDateString()}
                 </span>
               </div>
-              <div className="flex gap-2 flex-wrap mb-2">
-                {/* 감성태그 chip */}
-                {detailModalMarker.emotionTag && detailModalMarker.emotionTag.split(',').map((tag, idx) => (
-                  <span key={idx} className="inline-flex items-center px-3 py-1 bg-gradient-to-r from-pink-200 via-blue-100 to-yellow-100 text-blue-700 rounded-full text-sm font-semibold shadow-sm border border-blue-200 mr-2 mb-2">#{tag}</span>
-                ))}
-              </div>
+              {/* 사용자 입력 감성태그 표시 */}
+              {detailModalMarker.emotionTag && detailModalMarker.emotionTag.split(',').length > 0 && (
+                <div className="mb-3">
+                  <h4 className="text-sm font-semibold text-gray-600 mb-2 flex items-center gap-1">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                    </svg>
+                    감성태그
+                  </h4>
+                  <div className="flex gap-2 flex-wrap">
+                    {detailModalMarker.emotionTag.split(',').map((tag, idx) => (
+                      <span key={idx} className="inline-flex items-center px-3 py-1 bg-gradient-to-r from-pink-200 via-blue-100 to-yellow-100 text-blue-700 rounded-full text-sm font-semibold shadow-sm border border-blue-200">
+                        #{tag.trim()}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* 선택된 감정들 표시 */}
+              {detailModalMarker.emotion && detailModalMarker.emotion.split(',').length > 0 && (
+                <div className="mb-3">
+                  <h4 className="text-sm font-semibold text-gray-600 mb-2 flex items-center gap-1">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1m4 0h1m-6 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    선택된 감정
+                  </h4>
+                  <div className="flex gap-2 flex-wrap">
+                    {detailModalMarker.emotion.split(',').map((emotionId, idx) => {
+                      const emotion = emotions.find(e => e.id === emotionId.trim());
+                      return emotion ? (
+                        <span key={idx} className="inline-flex items-center gap-1 px-3 py-1 bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 rounded-full text-sm font-semibold shadow-sm border border-purple-200">
+                          <span className="text-base">{emotion.emoji}</span>
+                          <span>{emotion.name}</span>
+                        </span>
+                      ) : null;
+                    })}
+                  </div>
+                </div>
+              )}
               <div className="text-lg text-gray-800 mb-2 whitespace-pre-line font-medium leading-relaxed">
                 {detailModalMarker.description}
               </div>
@@ -1757,127 +1793,7 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
           </div>
         </div>
       )}
-      {detailModalOpen && multiMarkers.length > 0 && (
-        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-white/10">
-          <div className="relative bg-white rounded-3xl shadow-2xl max-w-lg w-full flex flex-col overflow-hidden border border-blue-100">
-            <button className="absolute top-4 right-4 text-3xl text-blue-400 hover:text-blue-700 z-10 bg-white rounded-full shadow p-2 transition" onClick={() => setDetailModalOpen(false)}>&times;</button>
-            {/* 인덱스/화살표 */}
-            <div className="flex items-center justify-center gap-4 mt-6 mb-2">
-              <button
-                className="text-2xl px-2 py-1 rounded hover:bg-gray-200 disabled:opacity-30 text-black"
-                onClick={() => setMultiMarkerIndex(i => Math.max(0, i - 1))}
-                disabled={multiMarkerIndex === 0}
-              >◀</button>
-              <span className="text-base text-gray-700 font-semibold">{multiMarkerIndex + 1} / {multiMarkers.length}</span>
-              <button
-                className="text-2xl px-2 py-1 rounded hover:bg-gray-200 disabled:opacity-30 text-black"
-                onClick={() => setMultiMarkerIndex(i => Math.min(multiMarkers.length - 1, i + 1))}
-                disabled={multiMarkerIndex === multiMarkers.length - 1}
-              >▶</button>
-            </div>
-            {/* 이미지 섹션 */}
-            <div className="bg-gradient-to-b from-blue-50 to-white p-6 pt-2">
-              {/* 썸네일 이미지 */}
-              {(() => {
-                const marker = multiMarkers[multiMarkerIndex];
-                const thumbnail = marker.images?.find(img => img.imageType === 'thumbnail');
-                if (!thumbnail) return null;
-                return (
-                  <div className="mb-6">
-                    <h3 className="text-lg font-semibold text-blue-700 mb-3 text-center">썸네일</h3>
-                    <div className="flex justify-center">
-                      <img
-                        src={getFullImageUrl(thumbnail.imageUrl)}
-                        alt="썸네일"
-                        className="max-h-64 max-w-full rounded-2xl object-contain shadow-lg border-2 border-blue-100"
-                      />
-                    </div>
-                  </div>
-                );
-              })()}
-              {/* 상세 이미지 그리드 */}
-              {(() => {
-                const marker = multiMarkers[multiMarkerIndex];
-                const detailImages = marker.images?.filter(img => img.imageType === 'detail' || img.imageType === 'gallery') || [];
-                if (detailImages.length === 0) return null;
-                return (
-                  <div>
-                    <h3 className="text-lg font-semibold text-blue-700 mb-3 text-center">상세 이미지</h3>
-                    <div className="grid grid-cols-3 gap-3">
-                      {detailImages.slice(0, 6).map((img, idx) => (
-                        <div key={idx} className="aspect-square">
-                          <img
-                            src={getFullImageUrl(img.imageUrl)}
-                            alt={`상세이미지${idx+1}`}
-                            className="w-full h-full object-cover rounded-xl shadow-md border border-gray-200"
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
-            {/* 정보 카드 */}
-            <div className="p-6 flex flex-col gap-3 border-t border-blue-100 bg-white">
-              <div className="flex items-center gap-3 mb-2">
-                <span className="font-semibold text-lg text-blue-700 flex items-center gap-1">
-                  <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
-                  {multiMarkers[multiMarkerIndex].author}
-                </span>
-                <span className="text-xs text-gray-400 flex items-center gap-1">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                  {new Date(multiMarkers[multiMarkerIndex].createdAt).toLocaleDateString()}
-                </span>
-              </div>
-              <div className="flex gap-2 flex-wrap mb-2">
-                {/* 감성태그 chip */}
-                {multiMarkers[multiMarkerIndex].emotionTag && multiMarkers[multiMarkerIndex].emotionTag.split(',').map((tag, idx) => (
-                  <span key={idx} className="inline-flex items-center px-3 py-1 bg-gradient-to-r from-pink-200 via-blue-100 to-yellow-100 text-blue-700 rounded-full text-sm font-semibold shadow-sm border border-blue-200 mr-2 mb-2">#{tag}</span>
-                ))}
-              </div>
-              <div className="text-lg text-gray-800 mb-2 whitespace-pre-line font-medium leading-relaxed">
-                {multiMarkers[multiMarkerIndex].description}
-              </div>
-              <div className="flex gap-6 text-gray-500 text-base mt-2 border-t border-blue-50 pt-3">
-                {/* YouTube 스타일 좋아요 버튼 */}
-                <button
-                  onClick={() => handleLikeToggle(multiMarkers[multiMarkerIndex].id)}
-                  disabled={likeLoading.has(multiMarkers[multiMarkerIndex].id)}
-                  className="flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed bg-gray-100 text-gray-700 hover:bg-gray-200"
-                >
-                  {likeLoading.has(multiMarkers[multiMarkerIndex].id) ? (
-                    <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                  ) : (
-                    <svg 
-                      className={`w-5 h-5 transition-all duration-200 ${
-                        multiMarkers[multiMarkerIndex].isLiked 
-                          ? 'fill-red-500 text-red-500 scale-110' 
-                          : 'stroke-current fill-none text-gray-700'
-                      }`}
-                      viewBox="0 0 24 24"
-                    >
-                      <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-                    </svg>
-                  )}
-                  <span className="font-semibold">{multiMarkers[multiMarkerIndex].likes}</span>
-                </button>
-                
-                {/* 조회수 표시 */}
-                <span className="flex items-center gap-1 px-4 py-2 bg-gray-100 rounded-full">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                  <span className="font-semibold">{multiMarkers[multiMarkerIndex].views}</span>
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+     
       </div>
   );
 } 
