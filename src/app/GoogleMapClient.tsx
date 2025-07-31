@@ -143,17 +143,25 @@ export default function GoogleMapClient() {
     setLikeLoading(prev => new Set([...prev, markerId]));
     
     try {
-      const response = await apiClient.post(`/markers/${markerId}/like`);
+      const response = await apiClient.post(`/markers/${markerId}/reaction`, {
+        like_type: "like"
+      });
       const { is_liked, likes } = response.data; // API 응답 필드명에 맞춤
       
       // 좋아요 상태는 마커 데이터의 isLiked 필드로 관리하므로 별도 Set 업데이트 불필요
       
       // 마커 데이터 업데이트 (isLiked 상태도 함께 업데이트)
-      setDetailModalMarker(prev => prev ? { 
-        ...prev, 
-        likes: likes, 
-        isLiked: is_liked 
-      } : null);
+      setDetailModalMarker(prev => {
+        if (!prev) {
+          console.warn('detailModalMarker가 null인 상태에서 좋아요 업데이트 시도');
+          return null;
+        }
+        return { 
+          ...prev, 
+          likes: likes, 
+          isLiked: is_liked 
+        };
+      });
       setMultiMarkers(prev => prev.map(marker => 
         marker.id === markerId ? { 
           ...marker, 
@@ -856,6 +864,14 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
     };
   }, []);
 
+  // detailModalMarker 상태 변화 모니터링
+  useEffect(() => {
+    console.log('detailModalMarker 상태 변화:', detailModalMarker);
+    if (detailModalMarker) {
+      console.log('detailModalMarker.views 값:', detailModalMarker.views);
+    }
+  }, [detailModalMarker]);
+
   // 플러스 버튼 클릭 핸들러
   const handlePlusClick = () => {
     setIsPlacingMarker(true);
@@ -953,6 +969,7 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
       
     } catch (error) {
       console.error('조회수 증가 API 호출 실패:', error);
+      // 에러가 발생해도 기존 detailModalMarker는 유지
     }
   };
 
@@ -1758,10 +1775,15 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
         </div>
       )}
       {/* 상세정보 모달 */}
-      {detailModalOpen && detailModalMarker && (() => {
-        console.log('상세 모달 렌더링 시 detailModalMarker:', detailModalMarker);
-        console.log('상세 모달 렌더링 시 views 값:', detailModalMarker.views);
-        return true;
+      {detailModalOpen && detailModalMarker && detailModalMarker.id && (() => {
+        try {
+          console.log('상세 모달 렌더링 시 detailModalMarker:', detailModalMarker);
+          console.log('상세 모달 렌더링 시 views 값:', detailModalMarker?.views);
+          return true;
+        } catch (error) {
+          console.error('상세 모달 렌더링 중 오류:', error);
+          return false;
+        }
       })() && (
         <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/70">
           <div className="relative bg-white rounded-3xl shadow-2xl max-w-lg w-full flex flex-col overflow-hidden border border-blue-100">
@@ -1812,15 +1834,15 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
               <div className="flex items-center gap-3 mb-2">
                 <span className="font-semibold text-lg text-blue-700 flex items-center gap-1">
                   <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
-                  {detailModalMarker.author}
+                  {detailModalMarker?.author}
                 </span>
                 <span className="text-xs text-gray-400 flex items-center gap-1">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                  {new Date(detailModalMarker.createdAt).toLocaleDateString()}
+                  {new Date(detailModalMarker?.createdAt || '').toLocaleDateString()}
                 </span>
               </div>
               {/* 사용자 입력 감성태그 표시 */}
-              {detailModalMarker.emotionTag && detailModalMarker.emotionTag.split(',').length > 0 && (
+              {detailModalMarker?.emotionTag && detailModalMarker.emotionTag.split(',').length > 0 && (
                 <div className="mb-3">
                   <h4 className="text-sm font-semibold text-gray-600 mb-2 flex items-center gap-1">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -1839,7 +1861,7 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
               )}
               
               {/* 선택된 감정들 표시 */}
-              {detailModalMarker.emotion && detailModalMarker.emotion.split(',').length > 0 && (
+              {detailModalMarker?.emotion && detailModalMarker.emotion.split(',').length > 0 && (
                 <div className="mb-3">
                   <h4 className="text-sm font-semibold text-gray-600 mb-2 flex items-center gap-1">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -1861,16 +1883,16 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                 </div>
               )}
               <div className="text-lg text-gray-800 mb-2 whitespace-pre-line font-medium leading-relaxed">
-                {detailModalMarker.description}
+                {detailModalMarker?.description}
               </div>
               <div className="flex gap-6 text-gray-500 text-base mt-2 border-t border-blue-50 pt-3">
                 {/* YouTube 스타일 좋아요 버튼 */}
                 <button
-                  onClick={() => handleLikeToggle(detailModalMarker.id)}
-                  disabled={likeLoading.has(detailModalMarker.id)}
+                  onClick={() => handleLikeToggle(detailModalMarker?.id || 0)}
+                  disabled={likeLoading.has(detailModalMarker?.id || 0)}
                   className="flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed bg-gray-100 text-gray-700 hover:bg-gray-200"
                 >
-                  {likeLoading.has(detailModalMarker.id) ? (
+                  {likeLoading.has(detailModalMarker?.id || 0) ? (
                     <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -1878,7 +1900,7 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                   ) : (
                     <svg 
                       className={`w-5 h-5 transition-all duration-200 ${
-                        detailModalMarker.isLiked 
+                        detailModalMarker?.isLiked 
                           ? 'fill-red-500 text-red-500 scale-110' 
                           : 'stroke-current fill-none text-gray-700'
                       }`}
@@ -1887,7 +1909,7 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                       <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
                     </svg>
                   )}
-                  <span className="font-semibold">{detailModalMarker.likes}</span>
+                  <span className="font-semibold">{detailModalMarker?.likes || 0}</span>
                 </button>
                 
                 {/* 조회수 표시 */}
@@ -1897,7 +1919,7 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
                   <span className="font-semibold">
-                    {detailModalMarker.views || 0}
+                    {detailModalMarker?.views || 0}
                   </span>
                 </span>
               </div>
