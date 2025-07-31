@@ -216,6 +216,14 @@ export default function GoogleMapClient() {
     }
   }, [myLocation, hasCentered]);
 
+  // detailModalMarker 상태 변화 모니터링
+  useEffect(() => {
+    console.log('detailModalMarker 상태 변화:', detailModalMarker);
+    if (detailModalMarker) {
+      console.log('detailModalMarker.views 값:', detailModalMarker.views);
+    }
+  }, [detailModalMarker]);
+
   // 로그인 상태 확인
   useEffect(() => {
     const checkLoginStatus = () => {
@@ -885,23 +893,96 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
 
   console.log('렌더링할 마커 개수:', markers.length, '현재 줌:', currentZoom);
 
+  // 상세 모달 열 때 조회수 증가 API 호출 및 최신 데이터로 업데이트
+  const incrementViewCount = async (markerId: number) => {
+    try {
+      const response = await apiClient.get(`/markers/${markerId}/detail`);
+      console.log('조회수 증가 API 호출 완료:', markerId);
+      console.log('API 응답 전체:', response.data);
+      
+      // API 응답에서 최신 데이터 추출
+      const { marker, images } = response.data;
+      console.log('마커 데이터:', marker);
+      console.log('views 값:', marker.views);
+      
+      // MarkerData 형태로 변환
+      const updatedMarker: MarkerData = {
+        id: marker.id,
+        latitude: marker.latitude,
+        longitude: marker.longitude,
+        description: marker.description,
+        author: marker.author,
+        emotionTag: marker.emotionTag || '',
+        emotion: marker.emotion || '',
+        thumbnailImg: marker.thumbnailImg,
+        likes: marker.likes,
+        views: marker.views || 0, // views가 undefined일 경우 0으로 설정
+        createdAt: marker.createdAt,
+        isLiked: marker.isLiked,
+        images: images.map((img: any) => ({
+          imageUrl: img.imageUrl,
+          imageType: img.imageType,
+          imageOrder: img.imageOrder,
+          isPrimary: img.isPrimary
+        }))
+      };
+      
+      console.log('업데이트된 마커 데이터:', updatedMarker);
+      console.log('업데이트된 views 값:', updatedMarker.views);
+      
+      // 상세 모달 데이터 업데이트
+      console.log('setDetailModalMarker 호출 전');
+      setDetailModalMarker(updatedMarker);
+      console.log('setDetailModalMarker 호출 후');
+      
+      // 이미지 배열 업데이트
+      const imageUrls: string[] = [];
+      // 썸네일 이미지 추가
+      if (updatedMarker.thumbnailImg) {
+        imageUrls.push(getFullImageUrl(updatedMarker.thumbnailImg) ?? '');
+      }
+      // 상세이미지들 추가
+      const detailImages = updatedMarker.images
+        .filter(img => img.imageType === 'detail')
+        .sort((a, b) => a.imageOrder - b.imageOrder)
+        .map(img => getFullImageUrl(img.imageUrl) ?? '');
+      imageUrls.push(...detailImages);
+      
+      setDetailModalImages(imageUrls.filter(Boolean));
+      setDetailModalIndex(0);
+      
+    } catch (error) {
+      console.error('조회수 증가 API 호출 실패:', error);
+    }
+  };
+
   // InfoWindow에서 이미지 클릭 시 상세정보 모달 오픈
   const handleMarkerImageClick = (marker: MarkerData) => {
-    const images: string[] = [];
-    // 썸네일 이미지 추가
-    if (marker.thumbnailImg) images.push(getFullImageUrl(marker.thumbnailImg) ?? '');
-    // 상세이미지들 추가 (marker.images 배열에서 detail 타입만)
-    if ((marker as any).images && Array.isArray((marker as any).images)) {
-      const detailImages = (marker as any).images
-        .filter((img: any) => img.imageType === 'detail')
-        .sort((a: any, b: any) => a.imageOrder - b.imageOrder)
-        .map((img: any) => getFullImageUrl(img.imageUrl) ?? '');
-      images.push(...detailImages);
-    }
-    setDetailModalMarker(marker);
-    setDetailModalImages(images.filter(Boolean));
-    setDetailModalIndex(0);
+    console.log('마커 클릭 - 초기 마커 데이터:', marker);
+    console.log('마커 클릭 - 초기 views 값:', marker.views);
+    
+    // 모달 상태 초기화
     setDetailModalOpen(true);
+    
+    // 초기 데이터 설정 (즉시 표시)
+    setDetailModalMarker(marker);
+    
+    // 이미지 배열 설정
+    const imageUrls: string[] = [];
+    if (marker.thumbnailImg) {
+      imageUrls.push(getFullImageUrl(marker.thumbnailImg) ?? '');
+    }
+    const detailImages = marker.images
+      .filter(img => img.imageType === 'detail')
+      .sort((a, b) => a.imageOrder - b.imageOrder)
+      .map(img => getFullImageUrl(img.imageUrl) ?? '');
+    imageUrls.push(...detailImages);
+    
+    setDetailModalImages(imageUrls.filter(Boolean));
+    setDetailModalIndex(0);
+    
+    // 조회수 증가 API 호출 및 최신 데이터로 업데이트
+    incrementViewCount(marker.id);
   };
 
   // 하버사인 공식: 두 위경도 좌표 사이 거리(m)
@@ -1382,10 +1463,34 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
               </div>
               <button
                 className="w-full py-1 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 text-sm"
-                onClick={() => {
-                  setDetailModalMarker(multiMarkers[multiMarkerIndex]);
-                  setDetailModalOpen(true);
-                }}
+                                  onClick={() => {
+                    console.log('상세보기 버튼 클릭 - 초기 마커 데이터:', multiMarkers[multiMarkerIndex]);
+                    console.log('상세보기 버튼 클릭 - 초기 views 값:', multiMarkers[multiMarkerIndex].views);
+                    
+                    // 모달 상태 초기화
+                    setDetailModalOpen(true);
+                    
+                    // 초기 데이터 설정 (즉시 표시)
+                    const marker = multiMarkers[multiMarkerIndex];
+                    setDetailModalMarker(marker);
+                    
+                    // 이미지 배열 설정
+                    const imageUrls: string[] = [];
+                    if (marker.thumbnailImg) {
+                      imageUrls.push(getFullImageUrl(marker.thumbnailImg) ?? '');
+                    }
+                    const detailImages = marker.images
+                      .filter(img => img.imageType === 'detail')
+                      .sort((a, b) => a.imageOrder - b.imageOrder)
+                      .map(img => getFullImageUrl(img.imageUrl) ?? '');
+                    imageUrls.push(...detailImages);
+                    
+                    setDetailModalImages(imageUrls.filter(Boolean));
+                    setDetailModalIndex(0);
+                    
+                    // 조회수 증가 API 호출 및 최신 데이터로 업데이트
+                    incrementViewCount(multiMarkers[multiMarkerIndex].id);
+                  }}
               >상세보기</button>
             </div>
           </InfoWindow>
@@ -1653,7 +1758,11 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
         </div>
       )}
       {/* 상세정보 모달 */}
-      {detailModalOpen && detailModalMarker && (
+      {detailModalOpen && detailModalMarker && (() => {
+        console.log('상세 모달 렌더링 시 detailModalMarker:', detailModalMarker);
+        console.log('상세 모달 렌더링 시 views 값:', detailModalMarker.views);
+        return true;
+      })() && (
         <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/70">
           <div className="relative bg-white rounded-3xl shadow-2xl max-w-lg w-full flex flex-col overflow-hidden border border-blue-100">
             <button className="absolute top-4 right-4 text-3xl text-blue-400 hover:text-blue-700 z-10 bg-white rounded-full shadow p-2 transition" onClick={() => setDetailModalOpen(false)}>&times;</button>
@@ -1784,9 +1893,12 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                 {/* 조회수 표시 */}
                 <span className="flex items-center gap-1 px-4 py-2 bg-gray-100 rounded-full">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.639 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.639 0-8.573-3.007-9.963-7.178z" />
                     <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
-                  <span className="font-semibold">{detailModalMarker.views}</span>
+                  <span className="font-semibold">
+                    {detailModalMarker.views || 0}
+                  </span>
                 </span>
               </div>
             </div>
