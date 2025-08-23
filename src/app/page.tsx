@@ -11,7 +11,7 @@ export default function Home() {
   // 언어 변경 감지
   useEffect(() => {
     const handleLanguageChange = () => {
-      console.log('홈 페이지 언어 변경 감지1');
+      console.log('홈 페이지 언어 변경 감지12');
       setForceUpdate(prev => prev + 1);
     };
 
