@@ -1744,7 +1744,19 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                   ) : null;
                 })()}
                 <div className="font-bold text-[13px] text-blue-900 leading-tight">{multiMarkers[multiMarkerIndex].author}</div>
-                <div className="text-xs text-gray-400">{new Date(multiMarkers[multiMarkerIndex].createdAt).toLocaleDateString()}</div>
+                <div className="text-xs text-gray-400">
+                  {new Date(multiMarkers[multiMarkerIndex].createdAt).toLocaleDateString('ko-KR', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                  })}
+                </div>
+                {/* <div className="text-xs text-gray-500">
+                  {new Date(multiMarkers[multiMarkerIndex].createdAt).toLocaleTimeString('ko-KR', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
+                </div> */}
               </div>
               {/* 상세 이미지 그리드 */}
               {(() => {
