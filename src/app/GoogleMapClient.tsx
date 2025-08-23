@@ -1239,52 +1239,16 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
 
   return (
     <div className="w-full h-full absolute inset-0">
-        {/* 지도 위 필터 바 */}
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex gap-2 bg-white rounded-full shadow px-4 py-2 border border-gray-200">
-          <button 
-            className={`text-sm font-medium px-3 py-1 rounded-full transition-colors ${
-              !isFilterActive 
-                ? 'text-blue-600 bg-blue-50' 
-                : 'text-gray-600 hover:bg-gray-100'
-            }`}
-            onClick={clearFilters}
-          >
-            전체 {!isFilterActive && `(${clusters.flatMap(cluster => cluster.markers || []).length}개)`}
-          </button>
-          <button 
-            className={`text-sm font-medium px-3 py-1 rounded-full transition-colors ${
-              filterSettings.selectedEmotions.length > 0 
-                ? 'text-blue-600 bg-blue-50' 
-                : 'text-gray-600 hover:bg-gray-100'
-            }`}
-            onClick={() => setShowFilterModal(true)}
-          >
-            필터 {filterSettings.selectedEmotions.length > 0 && `(${filterSettings.selectedEmotions.length})`}
-          </button>
-          {isFilterActive && (
-            <>
-              <span className="text-sm text-gray-600 px-3 py-1">
-                {filteredMarkers.length}개 표시
-              </span>
-              <button 
-                className="text-sm font-medium text-red-600 px-3 py-1 rounded-full bg-red-50 hover:bg-red-100"
-                onClick={clearFilters}
-              >
-                필터 해제
-              </button>
-            </>
-          )}
-        </div>
         {/* 지도 하단 우측에 확대/축소/마커추가 버튼 */}
         <div className="absolute bottom-32 right-4 z-30 flex flex-col gap-2 items-center">
           <button onClick={handleZoomIn} className="w-12 h-12 rounded-full bg-white border shadow flex items-center justify-center text-2xl font-bold text-black hover:bg-gray-100">+</button>
           <button onClick={handleZoomOut} className="w-12 h-12 rounded-full bg-white border shadow flex items-center justify-center text-2xl font-bold text-black hover:bg-gray-100">-</button>
           <button
-            className={`w-12 h-12 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-lg hover:bg-blue-700 text-3xl ${isPlacingMarker ? 'ring-4 ring-blue-200' : ''}`}
+            className={`w-12 h-12 rounded-full bg-white text-white flex items-center justify-center shadow-lg hover:bg-blue-700 ${isPlacingMarker ? 'ring-4 ring-blue-200' : ''}`}
             title="추가"
             onClick={handlePlusClick}
           >
-            +
+            <img src="/write.svg" alt="마커 추가" className="w-6 h-6" />
           </button>
         </div>
         
@@ -1295,11 +1259,7 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
             className="w-12 h-12 rounded-full bg-white border shadow flex items-center justify-center text-xl font-bold text-blue-600 hover:bg-blue-100"
             title="내 위치로 이동"
           >
-            {/* SVG 아이콘만 표시 */}
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <circle cx="12" cy="12" r="4" fill="#2563eb" />
-              <path stroke="#2563eb" strokeWidth="2" d="M12 2v2m0 16v2m10-10h-2M4 12H2m15.07-7.07l-1.41 1.41M6.34 17.66l-1.41 1.41m12.02 0l-1.41-1.41M6.34 6.34L4.93 4.93" />
-            </svg>
+            <img src="/gps.svg" alt="내 위치" className="w-7 h-7" />
           </button>
         </div>
         {/* 지도 상단 우측에 플러스(마커 생성) 버튼 + 내마커만보기 토글 */}
@@ -1332,7 +1292,7 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
           )}
         </div>
         {/* 검색창 */}
-        <div className="absolute top-20 left-4 right-4 z-10">
+        <div className="absolute top-10 left-4 right-4 z-10">
           <div className="relative">
             <input
               ref={searchBoxRef}
@@ -1341,15 +1301,14 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyPress={handleSearchKeyPress}
               placeholder="장소를 검색하세요..."
-              className="w-full px-4 py-3 pr-12 bg-white rounded-lg shadow-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder-gray-500"
+              className="w-[88%] sm:w-[90%] md:w-[95%] lg:w-[95%] px-4 py-3 pr-12 bg-white rounded-lg shadow-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder-gray-500"
             />
             <button
               onClick={handleSearch}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-blue-500"
+              className="absolute right-[15%] sm:right-[10%] md:right-[5%] lg:right-[8%] top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-blue-500"
             >
-              🔍
+              <img src="/search.svg" alt="검색" className="w-5 h-5" />
             </button>
-            
             
             {/* 검색 결과 드롭다운 */}
             {showSearchResults && searchResults.length > 0 && (
@@ -1372,6 +1331,15 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
               </div>
             )}
           </div>
+          
+          {/* 필터 버튼 - 검색 전체 영역의 오른쪽에 4px 마진으로 배치 */}
+          <button
+            className="absolute -right-1 top-1/2 transform -translate-y-1/2 w-10 h-10 bg-white rounded-full shadow-lg border border-gray-200 flex items-center justify-center hover:bg-gray-50 transition-colors"
+            title="필터"
+            onClick={() => setShowFilterModal(true)}
+          >
+            <img src="/filter.svg" alt="필터" className="w-5 h-5" />
+          </button>
         </div>
 
         <GoogleMap
@@ -1681,9 +1649,7 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
               <button
                 className="w-full py-1 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 text-sm"
                                   onClick={() => {
-                    console.log('상세보기 버튼 클릭 - 초기 마커 데이터:', multiMarkers[multiMarkerIndex]);
-                    console.log('상세보기 버튼 클릭 - 초기 views 값:', multiMarkers[multiMarkerIndex].views);
-                    
+                  
                     // 모달 상태 초기화
                     setDetailModalOpen(true);
                     
