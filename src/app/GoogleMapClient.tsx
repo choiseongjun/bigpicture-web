@@ -1275,17 +1275,21 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
             </>
           )}
         </div>
-        {/* 지도 하단 확대/축소/내위치 버튼 */}
+        {/* 지도 하단 우측에 확대/축소/마커추가 버튼 */}
         <div className="absolute bottom-32 right-4 z-30 flex flex-col gap-2 items-center">
-        <button
+          <button onClick={handleZoomIn} className="w-12 h-12 rounded-full bg-white border shadow flex items-center justify-center text-2xl font-bold text-black hover:bg-gray-100">+</button>
+          <button onClick={handleZoomOut} className="w-12 h-12 rounded-full bg-white border shadow flex items-center justify-center text-2xl font-bold text-black hover:bg-gray-100">-</button>
+          <button
             className={`w-12 h-12 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-lg hover:bg-blue-700 text-3xl ${isPlacingMarker ? 'ring-4 ring-blue-200' : ''}`}
             title="추가"
             onClick={handlePlusClick}
           >
             +
           </button>
-          <button onClick={handleZoomIn} className="w-12 h-12 rounded-full bg-white border shadow flex items-center justify-center text-2xl font-bold text-black hover:bg-gray-100">+</button>
-          <button onClick={handleZoomOut} className="w-12 h-12 rounded-full bg-white border shadow flex items-center justify-center text-2xl font-bold text-black hover:bg-gray-100">-</button>
+        </div>
+        
+        {/* 지도 하단 좌측에 내위치 버튼 */}
+        <div className="absolute bottom-32 left-4 z-30">
           <button
             onClick={handleMyLocation}
             className="w-12 h-12 rounded-full bg-white border shadow flex items-center justify-center text-xl font-bold text-blue-600 hover:bg-blue-100"
