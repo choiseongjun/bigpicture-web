@@ -1262,7 +1262,7 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
         mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
       >
         <div 
-          className="w-[30px] h-[30px] rounded-full border border-[#D8D8D8] overflow-hidden cursor-pointer hover:scale-110 transition-transform duration-200 shadow-lg"
+          className="w-[50px] h-[50px] rounded-full border border-[#D8D8D8] overflow-hidden cursor-pointer hover:scale-110 transition-transform duration-200 shadow-lg"
           onClick={onClick}
           style={{
             backgroundImage: fullImageUrl ? `url(${fullImageUrl})` : 'none',
@@ -1517,9 +1517,9 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                         mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
                       >
                         <div style={{ position: 'relative', width: 0, height: 0 }}>
-                          <div style={{
+                          {/* <div style={{
                             position: 'absolute',
-                            top: '5px',
+                            top: '25px',
                             left: '30px',
                             background: 'white',
                             color: '#8B8B8B',
@@ -1539,7 +1539,7 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                           }}>
                             <span style={{ fontSize: '12px' }}>{firstEmotion.emoji}</span>
                             <span>{firstEmotion.name}</span>
-                          </div>
+                          </div> */}
                         </div>
                       </OverlayView>
                     )}
@@ -1602,8 +1602,8 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                         <div style={{ position: 'relative', width: 0, height: 0 }}>
                           <div style={{
                             position: 'absolute',
-                            top: '5px',
-                            left: '30px',
+                            top: '15px',
+                            left: '50px',
                             background: 'white',
                             color: '#8B8B8B',
                             borderRadius: '10px',
