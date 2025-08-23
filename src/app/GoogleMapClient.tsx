@@ -351,14 +351,14 @@ export default function GoogleMapClient() {
       alert('감정을 1개 이상 선택하세요.');
       return;
     }
-    if (!thumbnailUrl) {
-      alert('썸네일 이미지를 업로드하세요.');
+    if (detailUrls.length === 0) {
+      alert('이미지를 1장 이상 업로드하세요.');
       return;
     }
     const latitude = placedMarker.lat;
     const longitude = placedMarker.lng;
-    const thumbnailImage = thumbnailUrl;
     const selectedImages = detailUrls;
+    const firstImage = selectedImages[0]; // 첫 번째 이미지를 썸네일로 사용
     const markerData = {
       latitude: latitude,
       longitude: longitude,
@@ -366,10 +366,10 @@ export default function GoogleMapClient() {
       emotion_tag: emotionTags.join(','), // 사용자가 입력한 감성태그들
       description: description.trim(),
       share_setting: shareSetting, // 공유 설정 추가
-      thumbnail_img: thumbnailImage.replace('https://bigpicture-jun-dev.s3.ap-northeast-2.amazonaws.com', ''),
+      thumbnail_img: firstImage.replace('https://bigpicture-jun-dev.s3.ap-northeast-2.amazonaws.com', ''),
       images: [
         {
-          image_url: thumbnailImage.replace('https://bigpicture-jun-dev.s3.ap-northeast-2.amazonaws.com', ''),
+          image_url: firstImage.replace('https://bigpicture-jun-dev.s3.ap-northeast-2.amazonaws.com', ''),
           image_type: 'thumbnail',
           image_order: 0,
           is_primary: true
@@ -393,9 +393,6 @@ export default function GoogleMapClient() {
       setEmotionTags([]);
       setSelectedEmotions([]);
       setShareSetting('public'); // 공유 설정 초기화
-      setThumbnailFile(null);
-      setThumbnailPreview(null);
-      setThumbnailUrl(null);
       setDetailFiles([]);
       setDetailPreviews([]);
       setDetailUrls([]);
@@ -905,9 +902,6 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
     setShowPlaceInfoWindow(false);
     setDescription('');
     setSelectedEmotions([]);
-    setThumbnailFile(null);
-    setThumbnailPreview(null);
-    setThumbnailUrl(null);
     setDetailFiles([]);
     setDetailPreviews([]);
     setDetailUrls([]);
@@ -1752,46 +1746,11 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                     placeholder="주소를 불러오는 중..."
                     className="w-full h-[22px] px-3 border border-[#f0f0f0] rounded text-sm text-gray-700 bg-white"
                   />
-                </div>               
-                <label className="block mb-4">
-                    {/* 주소 표시 입력창 */}
-                
-                  <span className="block text-sm font-medium text-gray-700 mb-1">썸네일 이미지</span>
-                  <div className="flex items-center gap-3">
-                    <div className="relative">
-                      <input 
-                        type="file" 
-                        accept="image/*" 
-                        onChange={handleThumbnailChange} 
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
-                      />
-                      <div className="w-[50px] h-[50px] border-2 border-blue-200 rounded-[5px] bg-gradient-to-br from-blue-50 to-indigo-50 flex flex-col items-center justify-center cursor-pointer hover:from-blue-100 hover:to-indigo-100 hover:border-blue-300 transition-all duration-200 shadow-sm">
-                        <img src="/camera.svg" alt="카메라" className="w-6 h-6" style={{ filter: 'brightness(0) saturate(100%) invert(24%) sepia(94%) saturate(2476%) hue-rotate(217deg) brightness(118%) contrast(119%)' }} />
-                        <span className="text-xs text-blue-600 mt-1 font-medium" style={{ fontSize: '12px' }}>0/1</span>
-                      </div>
-                    </div>
-                    {/* 선택된 썸네일 이미지 미리보기 */}
-                    {thumbnailPreview && (
-                      <div className="flex-1">
-                        <img 
-                          src={thumbnailPreview} 
-                          alt="썸네일 미리보기" 
-                          className="w-[50px] h-[50px] object-cover rounded-[5px] border border-gray-200" 
-                        />
-                      </div>
-                    )}
-                  </div>
-                  {thumbnailUrl && (
-                    <div className="text-xs text-green-600 mt-1">업로드 완료</div>
-                  )}
-                  {isThumbnailUploading && (
-                    <div className="text-xs text-blue-600 mt-1">업로딩 중...</div>
-                  )}
-                </label>
+                </div>
               
                               {/* 상세 이미지 업로드 */}
                 <label className="block mb-4">
-                  <span className="block text-sm font-medium text-gray-700 mb-1">상세 이미지 (여러 장)</span>
+                  <span className="block text-sm font-medium text-gray-700 mb-1">이미지 업로드 (첫 번째 이미지가 썸네일로 사용됩니다)</span>
                   <div className="relative">
                     <input 
                       type="file" 
@@ -1802,12 +1761,10 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                     />
                     <div className="w-[50px] h-[50px] border-2 border-blue-200 rounded-[5px] bg-gradient-to-br from-blue-50 to-indigo-50 flex flex-col items-center justify-center cursor-pointer hover:from-blue-100 hover:to-indigo-100 hover:border-blue-300 transition-all duration-200 shadow-sm">
                       <img src="/camera.svg" alt="카메라" className="w-6 h-6" style={{ filter: 'brightness(0) saturate(100%) invert(24%) sepia(94%) saturate(2476%) hue-rotate(217deg) brightness(118%) contrast(119%)' }} />
-                      <span className="text-xs text-blue-600 mt-1 font-medium" style={{ fontSize: '12px' }}>0/10</span>
+                      <span className="text-xs text-blue-600 mt-1 font-medium" style={{ fontSize: '12px' }}>{detailUrls.length}/10</span>
                     </div>
                   </div>
-                  {detailUrls.length > 0 && (
-                    <div className="text-xs text-green-600 mt-1">{detailUrls.length}장 업로드 완료</div>
-                  )}
+
                   {isDetailUploading && (
                     <div className="text-xs text-blue-600 mt-1">업로딩 중...</div>
                   )}
