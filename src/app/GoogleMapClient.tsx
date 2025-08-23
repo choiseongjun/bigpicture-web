@@ -645,29 +645,23 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
       return undefined;
     }
     
-    // 줌 레벨에 따라 마커 크기 조정
-    let size = 50; // 기본 크기
-    if (currentZoom <= 8) {
-      size = 80; // 매우 축소된 상태에서는 큰 마커
-    } else if (currentZoom <= 10) {
-      size = 65; // 축소된 상태에서는 중간 크기 마커
-    } else if (currentZoom <= 12) {
-      size = 55; // 보통 상태에서는 약간 큰 마커
-    } else {
-      size = 45; // 확대된 상태에서는 작은 마커
-    }
-    
-    const anchor = size / 2;
-    
+    // 간단한 원형 마커 생성 - 이미지 URL을 직접 사용
     const iconConfig = {
       url: fullImageUrl,
-      scaledSize: new window.google.maps.Size(size, size),
-      anchor: new window.google.maps.Point(anchor, anchor),
+      scaledSize: new window.google.maps.Size(30, 30),
+      anchor: new window.google.maps.Point(15, 15),
     };
     
-    console.log('아이콘 설정 (줌 레벨:', currentZoom, '크기:', size, '):', iconConfig);
+    console.log('아이콘 설정 (크기: 30x30):', iconConfig);
     return iconConfig;
-  }, [currentZoom]);
+  }, []);
+
+  // 첫 번째 감정을 가져오는 헬퍼 함수
+  const getFirstEmotion = useCallback((emotionString: string | undefined) => {
+    if (!emotionString) return null;
+    const firstEmotion = emotionString.split(',')[0].trim();
+    return emotions.find(e => e.id === firstEmotion);
+  }, []);
 
   const onMapLoad = (map: google.maps.Map) => {
     console.log('=== 맵 로드 완료 ===');
@@ -1254,6 +1248,33 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
     }
   }, [showFilterModal]);
 
+  // 커스텀 원형 마커 컴포넌트
+  const CustomMarker = ({ position, imageUrl, onClick }: { 
+    position: { lat: number; lng: number }; 
+    imageUrl: string; 
+    onClick: () => void; 
+  }) => {
+    const fullImageUrl = getFullImageUrl(imageUrl);
+    
+    return (
+      <OverlayView
+        position={position}
+        mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+      >
+        <div 
+          className="w-[30px] h-[30px] rounded-full border border-[#D8D8D8] overflow-hidden cursor-pointer hover:scale-110 transition-transform duration-200 shadow-lg"
+          onClick={onClick}
+          style={{
+            backgroundImage: fullImageUrl ? `url(${fullImageUrl})` : 'none',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundColor: fullImageUrl ? 'transparent' : '#D8D8D8'
+          }}
+        />
+      </OverlayView>
+    );
+  };
+
   return (
     <div className="w-full h-full absolute inset-0">
         {/* 지도 하단 우측에 확대/축소/마커추가 버튼 */}
@@ -1408,20 +1429,51 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                   // 동일 위치에 여러 마커가 겹친 경우
                   const markerGroup = cluster.markers;
                   const mainMarker = markerGroup[0];
-                  const icon = createCustomMarkerIcon(mainMarker.thumbnailImg);
+                  const firstEmotion = getFirstEmotion(mainMarker.emotion);
                   return (
                     <>
-                      <Marker
+                      <CustomMarker
                         key={cluster.h3_index}
                         position={{ lat: mainMarker.latitude, lng: mainMarker.longitude }}
-                        icon={icon}
+                        imageUrl={mainMarker.thumbnailImg}
                         onClick={() => {
                           setSelectedMarker(mainMarker);
                           setMultiMarkers(markerGroup);
                           setMultiMarkerIndex(0);
                         }}
-                        options={{ clickable: true, cursor: 'pointer' }}
                       />
+                      {firstEmotion && (
+                        <OverlayView
+                          position={{ lat: mainMarker.latitude, lng: mainMarker.longitude }}
+                          mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+                        >
+                          <div style={{ position: 'relative', width: 0, height: 0 }}>
+                            <div style={{
+                              position: 'absolute',
+                              top: '-10px',
+                              left: '30px',
+                              background: 'white',
+                              color: '#8B8B8B',
+                              borderRadius: '10px',
+                              padding: '2px 8px',
+                              fontSize: '10px',
+                              fontWeight: '500',
+                              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                              border: '1px solid #f0f0f0',
+                              zIndex: 10,
+                              pointerEvents: 'none',
+                              height: '20px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              whiteSpace: 'nowrap'
+                            }}>
+                              <span style={{ fontSize: '12px' }}>{firstEmotion.emoji}</span>
+                              <span>{firstEmotion.name}</span>
+                            </div>
+                          </div>
+                        </OverlayView>
+                      )}
                       <OverlayView
                         position={{ lat: mainMarker.latitude, lng: mainMarker.longitude }}
                         mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
@@ -1450,16 +1502,47 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                   );
                 } else if (cluster.count === 1 && cluster.markers && cluster.markers.length === 1) {
                   const marker = cluster.markers[0];
-                  const icon = createCustomMarkerIcon(marker.thumbnailImg);
+                  const firstEmotion = getFirstEmotion(marker.emotion);
                   return (
                    <>
-                    {/* <Marker
+                    <CustomMarker
                       key={cluster.h3_index}
                       position={{ lat: marker.latitude, lng: marker.longitude }}
-                      icon={icon}
+                      imageUrl={marker.thumbnailImg}
                       onClick={() => setSelectedMarker(marker)}
-                      options={{ clickable: true, cursor: 'pointer' }}
-                    /> */}
+                    />
+                    {firstEmotion && (
+                      <OverlayView
+                        position={{ lat: marker.latitude, lng: marker.longitude }}
+                        mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+                      >
+                        <div style={{ position: 'relative', width: 0, height: 0 }}>
+                          <div style={{
+                            position: 'absolute',
+                            top: '-10px',
+                            left: '30px',
+                            background: 'white',
+                            color: '#8B8B8B',
+                            borderRadius: '10px',
+                            padding: '2px 8px',
+                            fontSize: '10px',
+                            fontWeight: '500',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                            border: '1px solid #f0f0f0',
+                            zIndex: 10,
+                            pointerEvents: 'none',
+                            height: '20px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            whiteSpace: 'nowrap'
+                          }}>
+                            <span style={{ fontSize: '12px' }}>{firstEmotion.emoji}</span>
+                            <span>{firstEmotion.name}</span>
+                          </div>
+                        </div>
+                      </OverlayView>
+                    )}
                    </>
                   );
                 } else {
@@ -1497,24 +1580,52 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
               {!isPlacingMarker && markerGroups.map((group, idx) => {
                 if (!group) return null;
                 const mainMarker = group[0];
-                const icon = {
-                  url: getFullImageUrl(mainMarker.thumbnailImg) || 'https://maps.google.com/mapfiles/ms/icons/red-dot.png',
-                  scaledSize: typeof window !== 'undefined' && window.google ? new window.google.maps.Size(48, 48) : undefined,
-                  anchor: typeof window !== 'undefined' && window.google ? new window.google.maps.Point(24, 48) : undefined,
-                };
+                const firstEmotion = getFirstEmotion(mainMarker.emotion);
                 return (
                   <>
-                    <Marker
+                    <CustomMarker
                       key={mainMarker.id + '-group'}
                       position={{ lat: mainMarker.latitude, lng: mainMarker.longitude }}
-                      icon={icon}
+                      imageUrl={mainMarker.thumbnailImg}
                       onClick={() => {
                         setMultiMarkers(group);
                         setMultiMarkerIndex(0);
                         setSelectedMarker(group[0]);
                       }}
-                      options={{ clickable: true, cursor: 'pointer' }}
                     />
+                    {firstEmotion && (
+                      <OverlayView
+                        key={mainMarker.id + '-emotion'}
+                        position={{ lat: mainMarker.latitude, lng: mainMarker.longitude }}
+                        mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+                      >
+                        <div style={{ position: 'relative', width: 0, height: 0 }}>
+                          <div style={{
+                            position: 'absolute',
+                            top: '-10px',
+                            left: '30px',
+                            background: 'white',
+                            color: '#8B8B8B',
+                            borderRadius: '10px',
+                            padding: '2px 8px',
+                            fontSize: '10px',
+                            fontWeight: '500',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                            border: '1px solid #f0f0f0',
+                            zIndex: 10,
+                            pointerEvents: 'none',
+                            height: '20px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            whiteSpace: 'nowrap'
+                          }}>
+                            <span style={{ fontSize: '12px' }}>{firstEmotion.emoji}</span>
+                            <span>{firstEmotion.name}</span>
+                          </div>
+                        </div>
+                      </OverlayView>
+                    )}
                     {group.length > 1 && (
                       <OverlayView
                         key={mainMarker.id + '-overlay'}
@@ -1531,7 +1642,7 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                             borderRadius: '9999px',
                             padding: '2px 10px',
                             fontSize: '15px',
-                            fontWeight: 700,
+                            fontWeight: '700',
                             boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
                             border: '2px solid white',
                             zIndex: 10,
