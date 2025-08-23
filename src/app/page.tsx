@@ -41,7 +41,7 @@ export default function Home() {
         </button>
       </div> */}
       {/* 지도 영역 */}
-      <main className="flex-1 relative min-h-0 pt-14 mt-14">
+      <main className="flex-1 relative min-h-0 pt-14 mt-10">
         <GoogleMapClient />
       </main>
     </div>

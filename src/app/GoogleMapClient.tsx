@@ -1724,29 +1724,52 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
               {/* <h2 className="text-xl font-bold mb-4">좌표에 데이터 입력</h2>
               <div className="mb-2 text-sm text-gray-500">위도: <span className="font-mono text-blue-700 font-semibold">{placedMarker.lat}</span></div>
               <div className="mb-4 text-sm text-gray-500">경도: <span className="font-mono text-blue-700 font-semibold">{placedMarker.lng}</span></div> */}
- {/* 썸네일 이미지 업로드 */}
-              <label className="block mb-4">
-                <span className="block text-sm font-medium text-gray-700 mb-1">썸네일 이미지 (1장)</span>
-                <input type="file" accept="image/*" onChange={handleThumbnailChange} className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
-                {thumbnailUrl && (
-                  <div className="text-xs text-green-600 mt-1">업로드 완료</div>
-                )}
-                {isThumbnailUploading && (
-                  <div className="text-xs text-blue-600 mt-1">업로딩 중...</div>
-                )}
-              </label>
+                               {/* 썸네일 이미지 업로드 */}
+                <label className="block mb-4">
+                  <span className="block text-sm font-medium text-gray-700 mb-1">썸네일 이미지</span>
+                  <div className="relative">
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      onChange={handleThumbnailChange} 
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
+                    />
+                    <div className="w-[50px] h-[50px] border-2 border-blue-200 rounded-[5px] bg-gradient-to-br from-blue-50 to-indigo-50 flex flex-col items-center justify-center cursor-pointer hover:from-blue-100 hover:to-indigo-100 hover:border-blue-300 transition-all duration-200 shadow-sm">
+                      <img src="/camera.svg" alt="카메라" className="w-6 h-6" style={{ filter: 'brightness(0) saturate(100%) invert(24%) sepia(94%) saturate(2476%) hue-rotate(217deg) brightness(118%) contrast(119%)' }} />
+                      <span className="text-xs text-blue-600 mt-1 font-medium" style={{ fontSize: '12px' }}>0/1</span>
+                    </div>
+                  </div>
+                  {thumbnailUrl && (
+                    <div className="text-xs text-green-600 mt-1">업로드 완료</div>
+                  )}
+                  {isThumbnailUploading && (
+                    <div className="text-xs text-blue-600 mt-1">업로딩 중...</div>
+                  )}
+                </label>
               
-              {/* 상세 이미지 업로드 */}
-              <label className="block mb-4">
-                <span className="block text-sm font-medium text-gray-700 mb-1">상세 이미지 (여러 장)</span>
-                <input type="file" accept="image/*" multiple onChange={handleDetailChange} className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
-                {detailUrls.length > 0 && (
-                  <div className="text-xs text-green-600 mt-1">{detailUrls.length}장 업로드 완료</div>
-                )}
-                {isDetailUploading && (
-                  <div className="text-xs text-blue-600 mt-1">업로딩 중...</div>
-                )}
-              </label>
+                              {/* 상세 이미지 업로드 */}
+                <label className="block mb-4">
+                  <span className="block text-sm font-medium text-gray-700 mb-1">상세 이미지 (여러 장)</span>
+                  <div className="relative">
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      multiple 
+                      onChange={handleDetailChange} 
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
+                    />
+                    <div className="w-[50px] h-[50px] border-2 border-blue-200 rounded-[5px] bg-gradient-to-br from-blue-50 to-indigo-50 flex flex-col items-center justify-center cursor-pointer hover:from-blue-100 hover:to-indigo-100 hover:border-blue-300 transition-all duration-200 shadow-sm">
+                      <img src="/camera.svg" alt="카메라" className="w-6 h-6" style={{ filter: 'brightness(0) saturate(100%) invert(24%) sepia(94%) saturate(2476%) hue-rotate(217deg) brightness(118%) contrast(119%)' }} />
+                      <span className="text-xs text-blue-600 mt-1 font-medium" style={{ fontSize: '12px' }}>0/10</span>
+                    </div>
+                  </div>
+                  {detailUrls.length > 0 && (
+                    <div className="text-xs text-green-600 mt-1">{detailUrls.length}장 업로드 완료</div>
+                  )}
+                  {isDetailUploading && (
+                    <div className="text-xs text-blue-600 mt-1">업로딩 중...</div>
+                  )}
+                </label>
               
               {/* 상세 이미지 미리보기 */}
               {detailPreviews.length > 0 && (
@@ -1763,7 +1786,7 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
 
               {/* 감정 선택 */}
               <div className="mb-4">
-                <span className="block text-sm font-medium text-gray-700 mb-3">감정 선택</span>
+                <span className="block text-[12px] font-bold text-[#000000] mb-1">감정 선택</span>
                 
                 {/* 선택된 감정들 표시 */}
                 {selectedEmotions.length > 0 && (
@@ -1807,16 +1830,17 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                 </div>
               </div>
               {/* 설명 입력 */}
+              <span className="block text-[12px] font-bold text-[#000000] mb-1">피드 설명</span>
               <textarea
                 className="w-full mb-4 border rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition text-black"
-                placeholder="설명"
+                placeholder="피드 설명을 입력해 주세요"
                 rows={3}
                 value={description}
                 onChange={e => setDescription(e.target.value)}
               />
               {/* 감성태그 입력 */}
               <div className="mb-4">
-                <span className="block text-sm font-medium text-gray-700 mb-2">감성태그</span>
+                <span className="block text-[12px] font-bold text-[#000000] mb-1">감성태그</span>
                 <div className="flex gap-2 mb-2">
                   <input
                     type="text"
