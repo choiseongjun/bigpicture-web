@@ -1728,6 +1728,18 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
       {showPlaceModal && placedMarker && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-2xl shadow-2xl p-0 w-full max-w-md relative text-black overflow-hidden max-h-[90vh] flex flex-col">
+            {/* 닫기 버튼 */}
+            <button 
+              className="absolute top-4 right-4 z-10 text-3xl text-gray-400 hover:text-gray-700 bg-white rounded-full shadow p-2 transition-colors"
+              onClick={() => {
+                setShowPlaceModal(false); 
+                setPlacedMarker(null);
+                setIsPlacingMarker(false);
+              }}
+            >
+              ×
+            </button>
+            
             {/* 썸네일 미리보기 영역 */}
             <div className="w-full h-48 bg-gray-100 flex items-center justify-center">
               {thumbnailPreview ? (
@@ -1803,7 +1815,7 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                       ) : null;
                     })}
                   </div>
-                )}
+                )} 
                 
                 {/* 감정 선택 그리드 */}
                 <div className="grid grid-cols-4 gap-2">
