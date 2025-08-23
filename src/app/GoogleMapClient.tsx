@@ -1739,18 +1739,45 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
             
             {/* 폼 내용 영역 (스크롤 가능) */}
             <div className="flex-1 overflow-y-auto p-6">
-              <h2 className="text-xl font-bold mb-4">좌표에 데이터 입력</h2>
+              {/* <h2 className="text-xl font-bold mb-4">좌표에 데이터 입력</h2>
               <div className="mb-2 text-sm text-gray-500">위도: <span className="font-mono text-blue-700 font-semibold">{placedMarker.lat}</span></div>
-              <div className="mb-4 text-sm text-gray-500">경도: <span className="font-mono text-blue-700 font-semibold">{placedMarker.lng}</span></div>
-
-              {/* 설명 입력 */}
-              <textarea
-                className="w-full mb-4 border rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition text-black"
-                placeholder="설명"
-                rows={3}
-                value={description}
-                onChange={e => setDescription(e.target.value)}
-              />
+              <div className="mb-4 text-sm text-gray-500">경도: <span className="font-mono text-blue-700 font-semibold">{placedMarker.lng}</span></div> */}
+ {/* 썸네일 이미지 업로드 */}
+              <label className="block mb-4">
+                <span className="block text-sm font-medium text-gray-700 mb-1">썸네일 이미지 (1장)</span>
+                <input type="file" accept="image/*" onChange={handleThumbnailChange} className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
+                {thumbnailUrl && (
+                  <div className="text-xs text-green-600 mt-1">업로드 완료</div>
+                )}
+                {isThumbnailUploading && (
+                  <div className="text-xs text-blue-600 mt-1">업로딩 중...</div>
+                )}
+              </label>
+              
+              {/* 상세 이미지 업로드 */}
+              <label className="block mb-4">
+                <span className="block text-sm font-medium text-gray-700 mb-1">상세 이미지 (여러 장)</span>
+                <input type="file" accept="image/*" multiple onChange={handleDetailChange} className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
+                {detailUrls.length > 0 && (
+                  <div className="text-xs text-green-600 mt-1">{detailUrls.length}장 업로드 완료</div>
+                )}
+                {isDetailUploading && (
+                  <div className="text-xs text-blue-600 mt-1">업로딩 중...</div>
+                )}
+              </label>
+              
+              {/* 상세 이미지 미리보기 */}
+              {detailPreviews.length > 0 && (
+                <div className="mb-4">
+                  <span className="block text-sm font-medium text-gray-700 mb-2">상세 이미지 미리보기</span>
+                  <div className="flex gap-2 flex-wrap">
+                    {detailPreviews.map((src, idx) => (
+                      <img key={idx} src={src} alt={`상세이미지${idx+1}`} className="w-16 h-16 object-cover rounded-lg border" />
+                    ))}
+                  </div>
+                </div>
+              )}
+            
 
               {/* 감정 선택 */}
               <div className="mb-4">
@@ -1797,7 +1824,14 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                   ))}
                 </div>
               </div>
-
+              {/* 설명 입력 */}
+              <textarea
+                className="w-full mb-4 border rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition text-black"
+                placeholder="설명"
+                rows={3}
+                value={description}
+                onChange={e => setDescription(e.target.value)}
+              />
               {/* 감성태그 입력 */}
               <div className="mb-4">
                 <span className="block text-sm font-medium text-gray-700 mb-2">감성태그</span>
@@ -1805,7 +1839,7 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                   <input
                     type="text"
                     className="flex-1 border rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition text-black"
-                    placeholder="감성태그를 입력하세요 (엔터로 추가)"
+                    placeholder="감성태그를 입력하세요 "
                     value={emotionTag}
                     onChange={e => setEmotionTag(e.target.value)}
                     onKeyDown={handleEmotionTagKeyDown}
@@ -1841,41 +1875,7 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                 <div className="text-xs text-gray-500">엔터키를 누르거나 추가 버튼을 클릭하여 태그를 추가하세요</div>
               </div>
               
-              {/* 썸네일 이미지 업로드 */}
-              <label className="block mb-4">
-                <span className="block text-sm font-medium text-gray-700 mb-1">썸네일 이미지 (1장)</span>
-                <input type="file" accept="image/*" onChange={handleThumbnailChange} className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
-                {thumbnailUrl && (
-                  <div className="text-xs text-green-600 mt-1">업로드 완료</div>
-                )}
-                {isThumbnailUploading && (
-                  <div className="text-xs text-blue-600 mt-1">업로딩 중...</div>
-                )}
-              </label>
-              
-              {/* 상세 이미지 업로드 */}
-              <label className="block mb-4">
-                <span className="block text-sm font-medium text-gray-700 mb-1">상세 이미지 (여러 장)</span>
-                <input type="file" accept="image/*" multiple onChange={handleDetailChange} className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
-                {detailUrls.length > 0 && (
-                  <div className="text-xs text-green-600 mt-1">{detailUrls.length}장 업로드 완료</div>
-                )}
-                {isDetailUploading && (
-                  <div className="text-xs text-blue-600 mt-1">업로딩 중...</div>
-                )}
-              </label>
-              
-              {/* 상세 이미지 미리보기 */}
-              {detailPreviews.length > 0 && (
-                <div className="mb-4">
-                  <span className="block text-sm font-medium text-gray-700 mb-2">상세 이미지 미리보기</span>
-                  <div className="flex gap-2 flex-wrap">
-                    {detailPreviews.map((src, idx) => (
-                      <img key={idx} src={src} alt={`상세이미지${idx+1}`} className="w-16 h-16 object-cover rounded-lg border" />
-                    ))}
-                  </div>
-                </div>
-              )}
+             
 
               {/* 공유 설정 */}
               <div className="mb-4">
@@ -1952,7 +1952,7 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
             
             {/* 버튼 영역 (고정) */}
             <div className="p-6 border-t bg-white">
-              <div className="flex gap-3">
+              {/* <div className="flex gap-3">
                 <button
                   onClick={() => { setShowPlaceModal(false); setPlacedMarker(null); setIsPlacingMarker(false); }}
                   className="flex-1 px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
@@ -1965,7 +1965,13 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                 >
                   저장
                 </button>
-              </div>
+              </div> */}
+               <button
+                  onClick={handleSaveMarker}
+                  className="flex-1 w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  저장완료
+                </button>
             </div>
           </div>
         </div>
