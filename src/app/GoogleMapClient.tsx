@@ -1450,7 +1450,7 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                           <div style={{ position: 'relative', width: 0, height: 0 }}>
                             <div style={{
                               position: 'absolute',
-                              top: '-10px',
+                              top: '5px',
                               left: '30px',
                               background: 'white',
                               color: '#8B8B8B',
@@ -1519,7 +1519,7 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                         <div style={{ position: 'relative', width: 0, height: 0 }}>
                           <div style={{
                             position: 'absolute',
-                            top: '-10px',
+                            top: '5px',
                             left: '30px',
                             background: 'white',
                             color: '#8B8B8B',
@@ -1602,7 +1602,7 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                         <div style={{ position: 'relative', width: 0, height: 0 }}>
                           <div style={{
                             position: 'absolute',
-                            top: '-10px',
+                            top: '5px',
                             left: '30px',
                             background: 'white',
                             color: '#8B8B8B',
@@ -1764,11 +1764,34 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                   </div>
                 );
               })()}
-              <div className="flex flex-wrap gap-1 mb-1">
-                {multiMarkers[multiMarkerIndex].emotionTag && multiMarkers[multiMarkerIndex].emotionTag.split(',').map((tag, idx) => (
-                  <span key={idx} className="inline-flex items-center px-2 py-0.5 bg-gradient-to-r from-pink-100 via-blue-50 to-yellow-100 text-blue-700 rounded-full text-[11px] font-semibold shadow border border-blue-100">#{tag}</span>
-                ))}
-              </div>
+              {/* 감정 표시 */}
+              {multiMarkers[multiMarkerIndex].emotion && (
+                <div className="mb-2">
+                  <div className="text-xs text-gray-600 mb-1 font-medium">감정</div>
+                  <div className="flex flex-wrap gap-1">
+                    {multiMarkers[multiMarkerIndex].emotion.split(',').map((emotion, idx) => {
+                      const emotionData = getFirstEmotion(emotion.trim());
+                      return emotionData ? (
+                        <span key={idx} className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 text-gray-700 rounded-full text-[10px] font-medium border border-gray-200">
+                          <span style={{ fontSize: '12px' }}>{emotionData.emoji}</span>
+                          <span>{emotionData.name}</span>
+                        </span>
+                      ) : null;
+                    })}
+                  </div>
+                </div>
+              )}
+              {/* 감성 태그 표시 */}
+              {multiMarkers[multiMarkerIndex].emotionTag && (
+                <div className="mb-2">
+                  <div className="text-xs text-gray-600 mb-1 font-medium">감성</div>
+                  <div className="flex flex-wrap gap-1">
+                    {multiMarkers[multiMarkerIndex].emotionTag.split(',').map((tag, idx) => (
+                      <span key={idx} className="inline-flex items-center px-2 py-1 bg-gradient-to-r from-pink-200 via-purple-100 to-indigo-200 text-purple-800 rounded-full text-[10px] font-medium shadow-sm border border-purple-200 hover:shadow-md transition-shadow duration-200">#{tag.trim()}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
               <p className="text-[13px] text-gray-800 mb-1 leading-snug font-medium truncate">{multiMarkers[multiMarkerIndex].description}</p>
               <div className="flex justify-between text-[11px] text-gray-400 mt-1 mb-2">
                 <span>❤️ {multiMarkers[multiMarkerIndex].likes}</span>
