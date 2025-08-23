@@ -152,6 +152,7 @@ export default function GoogleMapClient() {
   });
   const [filteredMarkers, setFilteredMarkers] = useState<MarkerData[]>([]);
   const [isFilterActive, setIsFilterActive] = useState(false);
+  const [address, setAddress] = useState<string>('');
 
   // 좋아요 토글 함수
   const handleLikeToggle = async (markerId: number) => {
@@ -915,10 +916,32 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
     }
   };
 
+  // 좌표를 주소로 변환하는 함수
+  const getAddressFromCoordinates = useCallback(async (lat: number, lng: number) => {
+    try {
+      const response = await fetch(
+        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&language=ko`
+      );
+      const data = await response.json();
+      
+      if (data.results && data.results.length > 0) {
+        const formattedAddress = data.results[0].formatted_address;
+        setAddress(formattedAddress);
+      }
+    } catch (error) {
+      console.error('주소 변환 실패:', error);
+      setAddress('주소를 불러올 수 없습니다');
+    }
+  }, []);
+
   // 지도 클릭 핸들러
   const handleMapClick = (e: google.maps.MapMouseEvent) => {
     if (isPlacingMarker && e.latLng) {
-      setPlacedMarker({ lat: e.latLng.lat(), lng: e.latLng.lng() });
+      const lat = e.latLng.lat();
+      const lng = e.latLng.lng();
+      setPlacedMarker({ lat, lng });
+      // 좌표가 설정되면 주소를 가져옴
+      getAddressFromCoordinates(lat, lng);
       setShowPlaceInfoWindow(true);
       setIsPlacingMarker(false);
       // 지도 커서를 기본으로 복원
@@ -1710,14 +1733,7 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
               ×
             </button>
             
-            {/* 썸네일 미리보기 영역 */}
-            <div className="w-full h-48 bg-gray-100 flex items-center justify-center">
-              {thumbnailPreview ? (
-                <img src={thumbnailPreview} alt="썸네일 미리보기" className="object-cover w-full h-full" style={{ borderTopLeftRadius: '1rem', borderTopRightRadius: '1rem' }} />
-              ) : (
-                <span className="text-gray-400">썸네일 미리보기</span>
-              )}
-            </div>
+          
             
             {/* 폼 내용 영역 (스크롤 가능) */}
             <div className="flex-1 overflow-y-auto p-6">
@@ -1725,19 +1741,45 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
               <div className="mb-2 text-sm text-gray-500">위도: <span className="font-mono text-blue-700 font-semibold">{placedMarker.lat}</span></div>
               <div className="mb-4 text-sm text-gray-500">경도: <span className="font-mono text-blue-700 font-semibold">{placedMarker.lng}</span></div> */}
                                {/* 썸네일 이미지 업로드 */}
+                
+
+                <div className=" mb-3 mt-6">
+                <h3 className="text-[12px] font-bold text-gray-800 mb-3">지역</h3>
+                  <input
+                    type="text"
+                    value={address}
+                    readOnly
+                    placeholder="주소를 불러오는 중..."
+                    className="w-full h-[22px] px-3 border border-[#f0f0f0] rounded text-sm text-gray-700 bg-white"
+                  />
+                </div>               
                 <label className="block mb-4">
+                    {/* 주소 표시 입력창 */}
+                
                   <span className="block text-sm font-medium text-gray-700 mb-1">썸네일 이미지</span>
-                  <div className="relative">
-                    <input 
-                      type="file" 
-                      accept="image/*" 
-                      onChange={handleThumbnailChange} 
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
-                    />
-                    <div className="w-[50px] h-[50px] border-2 border-blue-200 rounded-[5px] bg-gradient-to-br from-blue-50 to-indigo-50 flex flex-col items-center justify-center cursor-pointer hover:from-blue-100 hover:to-indigo-100 hover:border-blue-300 transition-all duration-200 shadow-sm">
-                      <img src="/camera.svg" alt="카메라" className="w-6 h-6" style={{ filter: 'brightness(0) saturate(100%) invert(24%) sepia(94%) saturate(2476%) hue-rotate(217deg) brightness(118%) contrast(119%)' }} />
-                      <span className="text-xs text-blue-600 mt-1 font-medium" style={{ fontSize: '12px' }}>0/1</span>
+                  <div className="flex items-center gap-3">
+                    <div className="relative">
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        onChange={handleThumbnailChange} 
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
+                      />
+                      <div className="w-[50px] h-[50px] border-2 border-blue-200 rounded-[5px] bg-gradient-to-br from-blue-50 to-indigo-50 flex flex-col items-center justify-center cursor-pointer hover:from-blue-100 hover:to-indigo-100 hover:border-blue-300 transition-all duration-200 shadow-sm">
+                        <img src="/camera.svg" alt="카메라" className="w-6 h-6" style={{ filter: 'brightness(0) saturate(100%) invert(24%) sepia(94%) saturate(2476%) hue-rotate(217deg) brightness(118%) contrast(119%)' }} />
+                        <span className="text-xs text-blue-600 mt-1 font-medium" style={{ fontSize: '12px' }}>0/1</span>
+                      </div>
                     </div>
+                    {/* 선택된 썸네일 이미지 미리보기 */}
+                    {thumbnailPreview && (
+                      <div className="flex-1">
+                        <img 
+                          src={thumbnailPreview} 
+                          alt="썸네일 미리보기" 
+                          className="w-[50px] h-[50px] object-cover rounded-[5px] border border-gray-200" 
+                        />
+                      </div>
+                    )}
                   </div>
                   {thumbnailUrl && (
                     <div className="text-xs text-green-600 mt-1">업로드 완료</div>
