@@ -48,8 +48,8 @@ interface MarkerData {
   emotionTag: string;
   emotion?: string; // 선택된 감정들 (predefined emotions)
   thumbnailImg: string;
-  likes: number;
-  views: number;
+  likes?: number; // API 응답에서 undefined일 수 있음
+  views?: number; // API 응답에서 undefined일 수 있음
   createdAt: string;
   isLiked?: boolean; // 좋아요 상태
   images: {
@@ -102,6 +102,8 @@ export default function GoogleMapClient() {
   const [isDetailUploading, setIsDetailUploading] = useState(false);
   // 개별 파일 업로드 진행 상황 추적
   const [uploadProgress, setUploadProgress] = useState<Map<string, { status: 'pending' | 'uploading' | 'success' | 'error'; progress?: number; error?: string }>>(new Map());
+  // 이미지 상세보기 모달 상태
+  const [imageDetailModal, setImageDetailModal] = useState<{ open: boolean; imageUrl: string; fileName: string }>({ open: false, imageUrl: '', fileName: '' });
   const [description, setDescription] = useState('');
   const [emotionTag, setEmotionTag] = useState('');
   const [emotionTags, setEmotionTags] = useState<string[]>([]);
@@ -341,6 +343,22 @@ export default function GoogleMapClient() {
       handleAddEmotionTag();
     }
   };
+
+  // 이미지 상세보기 모달 열기
+  const openImageDetailModal = (imageUrl: string, fileName: string) => {
+    console.log('🔍 이미지 상세보기 모달 열기:', { imageUrl, fileName });
+    setImageDetailModal({ open: true, imageUrl, fileName });
+  };
+
+  // 이미지 상세보기 모달 닫기
+  const closeImageDetailModal = () => {
+    setImageDetailModal({ open: false, imageUrl: '', fileName: '' });
+  };
+
+  // 이미지 상세보기 모달 상태 변화 추적
+  useEffect(() => {
+    console.log('📱 이미지 상세보기 모달 상태 변화:', imageDetailModal);
+  }, [imageDetailModal]);
 
   // 저장 버튼 클릭 핸들러
   const handleSaveMarker = async () => {
@@ -1223,7 +1241,15 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
       
       // API 응답에서 최신 데이터 추출
       const { marker, images } = response.data;
+      console.log('API 응답 전체 구조:', response.data);
       console.log('마커 데이터:', marker);
+      
+      // marker가 존재하는지 확인
+      // if (!marker) {
+      //   console.error('API 응답에 marker 데이터가 없습니다');
+      //   return;
+      // }
+      
       console.log('views 값:', marker.views);
       
       // MarkerData 형태로 변환
@@ -1236,11 +1262,11 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
         emotionTag: marker.emotionTag || '',
         emotion: marker.emotion || '',
         thumbnailImg: marker.thumbnailImg,
-        likes: marker.likes,
+        likes: marker.likes || 0,
         views: marker.views || 0, // views가 undefined일 경우 0으로 설정
         createdAt: marker.createdAt,
-        isLiked: marker.isLiked,
-        images: images.map((img: any) => ({
+        isLiked: marker.isLiked || false,
+        images: (images || []).map((img: any) => ({
           imageUrl: img.imageUrl,
           imageType: img.imageType,
           imageOrder: img.imageOrder,
@@ -1281,7 +1307,7 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
   // InfoWindow에서 이미지 클릭 시 상세정보 모달 오픈
   const handleMarkerImageClick = (marker: MarkerData) => {
     console.log('마커 클릭 - 초기 마커 데이터:', marker);
-    console.log('마커 클릭 - 초기 views 값:', marker.views);
+    console.log('마커 클릭 - 초기 views 값:', marker?.views || 0);
     
     // 모달 상태 초기화
     setDetailModalOpen(true);
@@ -1420,14 +1446,14 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
 
     // 좋아요 범위 필터
     filtered = filtered.filter(marker => 
-      marker.likes >= filterSettings.likesRange.min && 
-      marker.likes <= filterSettings.likesRange.max
+      (marker.likes || 0) >= filterSettings.likesRange.min && 
+      (marker.likes || 0) <= filterSettings.likesRange.max
     );
 
     // 조회수 범위 필터
     filtered = filtered.filter(marker => 
-      marker.views >= filterSettings.viewsRange.min && 
-      marker.views <= filterSettings.viewsRange.max
+      (marker.views || 0) >= filterSettings.viewsRange.min && 
+      (marker.views || 0) <= filterSettings.viewsRange.max
     );
 
     // 작성자 필터
@@ -1459,11 +1485,11 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
         case 'oldest':
           return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
         case 'likes':
-          return b.likes - a.likes;
+          return (b.likes || 0) - (a.likes || 0);
         case 'views':
-          return b.views - a.views;
+          return (b.views || 0) - (a.views || 0);
         case 'popular':
-          return (b.likes + b.views) - (a.likes + a.views);
+          return ((b.likes || 0) + (b.views || 0)) - ((a.likes || 0) + (a.views || 0));
         default:
           return 0;
       }
@@ -2040,7 +2066,17 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                         key={idx}
                         src={getFullImageUrl(img.imageUrl)}
                         alt={`상세이미지${idx+1}`}
-                        className="w-16 h-16 object-cover rounded-lg border"
+                        className="w-16 h-16 object-cover rounded-lg border cursor-pointer hover:scale-105 transition-transform duration-200"
+                        onClick={() => {
+                          if (img.imageUrl) {
+                            const fullUrl = getFullImageUrl(img.imageUrl);
+                            if (fullUrl) {
+                              console.log('🖱️ 마커 이미지 클릭됨:', { imageUrl: img.imageUrl, fileName: `이미지${idx+1}` });
+                              openImageDetailModal(fullUrl, `이미지${idx+1}`);
+                            }
+                          }
+                        }}
+                        title="클릭하여 크게 보기"
                       />
                     ))}
                   </div>
@@ -2076,8 +2112,8 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
               )}
               <p className="text-[13px] text-gray-800 mb-1 leading-snug font-medium truncate">{multiMarkers[multiMarkerIndex].description}</p>
               <div className="flex justify-between text-[11px] text-gray-400 mt-1 mb-2">
-                <span>❤️ {multiMarkers[multiMarkerIndex].likes}</span>
-                <span>👁️ {multiMarkers[multiMarkerIndex].views}</span>
+                                        <span>❤️ {multiMarkers[multiMarkerIndex]?.likes || 0}</span>
+                        <span>👁️ {multiMarkers[multiMarkerIndex]?.views || 0}</span>
               </div>
               <button
                 className="w-full py-1 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 text-sm"
@@ -2210,7 +2246,12 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                           <img 
                             src={src} 
                             alt={`상세이미지${idx+1}`} 
-                            className="w-16 h-16 object-cover rounded-lg border" 
+                            className="w-16 h-16 object-cover rounded-lg border cursor-pointer hover:scale-105 transition-transform duration-200" 
+                            onClick={() => {
+                              console.log('🖱️ 이미지 클릭됨:', { src, fileName });
+                              openImageDetailModal(src, fileName);
+                            }}
+                            title="클릭하여 크게 보기"
                           />
                           
                           {/* 프로그레스 오버레이 */}
@@ -2538,7 +2579,17 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                           <img
                             src={getFullImageUrl(img.imageUrl)}
                             alt={`상세이미지${idx+1}`}
-                            className="w-full h-full object-cover rounded-xl shadow-md border border-gray-200"
+                            className="w-full h-full object-cover rounded-xl shadow-md border border-gray-200 cursor-pointer hover:scale-105 transition-transform duration-200"
+                            onClick={() => {
+                              if (img.imageUrl) {
+                                const fullUrl = getFullImageUrl(img.imageUrl);
+                                if (fullUrl) {
+                                  console.log('🖱️ 마커 상세 모달 이미지 클릭됨:', { imageUrl: img.imageUrl, fileName: `상세이미지${idx+1}` });
+                                  openImageDetailModal(fullUrl, `상세이미지${idx+1}`);
+                                }
+                              }
+                            }}
+                            title="클릭하여 크게 보기"
                           />
                         </div>
                       ))}
@@ -2872,6 +2923,71 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                 필터 적용
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 이미지 상세보기 모달 */}
+      {imageDetailModal.open && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/0 backdrop-blur-sm">
+          <div className="relative max-w-[90vw] max-h-[90vh] bg-white rounded-2xl shadow-2xl overflow-hidden">
+            {/* 모달 헤더 */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                  <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">이미지 상세보기</h3>
+                  <p className="text-sm text-gray-500">{imageDetailModal.fileName}</p>
+                </div>
+              </div>
+              <button
+                onClick={closeImageDetailModal}
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* 이미지 컨테이너 */}
+            <div className="p-6 bg-white">
+              <div className="flex justify-center">
+                <img
+                  src={imageDetailModal.imageUrl}
+                  alt={imageDetailModal.fileName}
+                  className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-lg"
+                  style={{ maxWidth: '100%', maxHeight: '70vh' }}
+                />
+              </div>
+            </div>
+
+            {/* 하단 액션 버튼 */}
+            {/* <div className="flex items-center justify-center gap-4 p-4 border-t border-gray-200 bg-gray-50">
+              <button
+                onClick={() => {
+                  // 새 탭에서 이미지 열기
+                  window.open(imageDetailModal.imageUrl, '_blank');
+                }}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+                새 탭에서 열기
+              </button>
+              
+              <button
+                onClick={closeImageDetailModal}
+                className="px-4 py-2 text-gray-600 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
+              >
+                닫기
+              </button>
+            </div> */}
           </div>
         </div>
       )}
