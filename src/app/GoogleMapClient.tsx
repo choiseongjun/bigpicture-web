@@ -2147,43 +2147,10 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                     </div>
                   </div>
 
-                  {/* 업로드 진행 상황 표시 */}
+                  {/* 간단한 업로드 상태 표시 */}
                   {isDetailUploading && (
-                    <div className="mt-3 space-y-2">
-                      <div className="text-xs text-blue-600 font-medium">업로드 진행 상황</div>
-                      {Array.from(uploadProgress.entries()).map(([fileName, progress]) => (
-                        <div key={fileName} className="bg-gray-50 rounded-lg p-2">
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-xs text-gray-700 truncate flex-1 mr-2">{fileName}</span>
-                            <span className="text-xs font-medium">
-                              {progress.status === 'pending' && '대기 중'}
-                              {progress.status === 'uploading' && '업로드 중'}
-                              {progress.status === 'success' && '✅ 완료'}
-                              {progress.status === 'error' && '❌ 실패'}
-                            </span>
-                          </div>
-                          
-                          {/* 진행 바 */}
-                          {progress.status === 'uploading' && (
-                            <div className="w-full bg-gray-200 rounded-full h-2">
-                              <div 
-                                className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-                                style={{ width: `${progress.progress || 0}%` }}
-                              />
-                            </div>
-                          )}
-                          
-                          {/* 에러 메시지 */}
-                          {progress.status === 'error' && progress.error && (
-                            <div className="text-xs text-red-600 mt-1">{progress.error}</div>
-                          )}
-                          
-                          {/* 성공 메시지 */}
-                          {progress.status === 'success' && (
-                            <div className="text-xs text-green-600 mt-1">업로드 완료!</div>
-                          )}
-                        </div>
-                      ))}
+                    <div className="mt-2 text-xs text-blue-600">
+                      📤 이미지 업로드 중... ({Array.from(uploadProgress.values()).filter(p => p.status === 'uploading').length}개 진행 중)
                     </div>
                   )}
                 </label>
@@ -2193,9 +2160,64 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                 <div className="mb-4">
                   <span className="block text-sm font-medium text-gray-700 mb-2">상세 이미지 미리보기</span>
                   <div className="flex gap-2 flex-wrap">
-                    {detailPreviews.map((src, idx) => (
-                      <img key={idx} src={src} alt={`상세이미지${idx+1}`} className="w-16 h-16 object-cover rounded-lg border" />
-                    ))}
+                    {detailPreviews.map((src, idx) => {
+                      // 해당 이미지의 파일명 찾기
+                      const fileName = detailFiles[idx]?.name || `이미지${idx+1}`;
+                      const progress = uploadProgress.get(fileName);
+                      
+                      return (
+                        <div key={idx} className="relative">
+                          <img 
+                            src={src} 
+                            alt={`상세이미지${idx+1}`} 
+                            className="w-16 h-16 object-cover rounded-lg border" 
+                          />
+                          
+                          {/* 프로그레스 오버레이 */}
+                          {progress && progress.status !== 'success' && (
+                            <div className="absolute inset-0 bg-black/50 rounded-lg flex flex-col items-center justify-center">
+                              {/* 상태 아이콘 */}
+                              <div className="text-white text-xs mb-1">
+                                {progress.status === 'pending' && '⏳'}
+                                {progress.status === 'uploading' && '📤'}
+                                {progress.status === 'error' && '❌'}
+                              </div>
+                              
+                              {/* 진행률 텍스트 */}
+                              <div className="text-white text-xs font-medium">
+                                {progress.status === 'pending' && '대기 중'}
+                                {progress.status === 'uploading' && `${Math.round(progress.progress || 0)}%`}
+                                {progress.status === 'error' && '실패'}
+                              </div>
+                              
+                              {/* 진행 바 */}
+                              {progress.status === 'uploading' && (
+                                <div className="w-12 bg-white/30 rounded-full h-1 mt-1">
+                                  <div 
+                                    className="bg-blue-400 h-1 rounded-full transition-all duration-300"
+                                    style={{ width: `${progress.progress || 0}%` }}
+                                  />
+                                </div>
+                              )}
+                              
+                              {/* 에러 메시지 */}
+                              {progress.status === 'error' && progress.error && (
+                                <div className="text-white text-xs mt-1 text-center px-1">
+                                  {progress.error.length > 10 ? progress.error.substring(0, 10) + '...' : progress.error}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          
+                          {/* 성공 표시 */}
+                          {progress && progress.status === 'success' && (
+                            <div className="absolute top-1 right-1 bg-green-500 text-white rounded-full w-5 h-5 flex items-center justify-center">
+                              <span className="text-xs">✓</span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
