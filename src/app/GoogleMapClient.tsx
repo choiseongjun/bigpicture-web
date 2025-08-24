@@ -104,6 +104,7 @@ export default function GoogleMapClient() {
   const [uploadProgress, setUploadProgress] = useState<Map<string, { status: 'pending' | 'uploading' | 'success' | 'error'; progress?: number; error?: string }>>(new Map());
   // 이미지 상세보기 모달 상태
   const [imageDetailModal, setImageDetailModal] = useState<{ open: boolean; imageUrl: string; fileName: string }>({ open: false, imageUrl: '', fileName: '' });
+
   const [description, setDescription] = useState('');
   const [emotionTag, setEmotionTag] = useState('');
   const [emotionTags, setEmotionTags] = useState<string[]>([]);
@@ -509,28 +510,78 @@ const handleDetailChange = async (e: ChangeEvent<HTMLInputElement>) => {
         const formData = new FormData();
         formData.append('image', file);
         
-        // iOS에서 더 단순한 요청 설정
-        const config = {
-          timeout: timeout,
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-          maxContentLength: Infinity,
-          maxBodyLength: Infinity,
-        };
-
-        // iOS에서 추가 헤더 설정 (연결 문제 해결)
-        if (isIOS) {
-          config.headers = {
-            ...config.headers
-          };
-        }
-
-        const res = await apiClient.post('/s3/upload/normal', formData, config);
-        
-        console.log(`✅ 업로드 성공: ${file.name}`, res.data);
-        const fullS3Url = `https://bigpicture-jun-dev.s3.ap-northeast-2.amazonaws.com${res.data.s3_url}`;
-        return { success: true, url: fullS3Url, file };
+        // 실제 업로드 진행률을 추적하기 위해 XMLHttpRequest 사용
+        return new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          
+          // 진행률 이벤트 리스너
+          xhr.upload.addEventListener('progress', (event) => {
+            console.log(`📊 진행률 이벤트 발생: ${file.name}`, {
+              loaded: event.loaded,
+              total: event.total,
+              lengthComputable: event.lengthComputable,
+              progress: event.lengthComputable ? Math.round((event.loaded / event.total) * 100) : 'N/A'
+            });
+            
+            if (event.lengthComputable) {
+              const progress = Math.round((event.loaded / event.total) * 100);
+              console.log(`📈 진행률 업데이트: ${file.name} - ${progress}%`);
+              setUploadProgress(prev => new Map(prev.set(file.name, { 
+                status: 'uploading', 
+                progress: progress 
+              })));
+            } else {
+              console.log(`⚠️ 진행률 계산 불가: ${file.name} - lengthComputable: false`);
+            }
+          });
+          
+          // 완료 이벤트 리스너
+          xhr.addEventListener('load', () => {
+            console.log(`🎯 load 이벤트 발생: ${file.name}`, {
+              status: xhr.status,
+              statusText: xhr.statusText,
+              responseLength: xhr.responseText?.length
+            });
+            
+            if (xhr.status >= 200 && xhr.status < 300) {
+              try {
+                const response = JSON.parse(xhr.responseText);
+                console.log(`✅ 업로드 성공: ${file.name}`, response);
+                const fullS3Url = `https://bigpicture-jun-dev.s3.ap-northeast-2.amazonaws.com${response.s3_url}`;
+                resolve({ success: true, url: fullS3Url, file });
+              } catch (parseError) {
+                console.error('응답 파싱 오류:', parseError);
+                reject({ success: false, file, error: { message: '응답 파싱 실패' } });
+              }
+            } else {
+              reject({ success: false, file, error: { message: `HTTP ${xhr.status}: ${xhr.statusText}` } });
+            }
+          });
+          
+          // 오류 이벤트 리스너
+          xhr.addEventListener('error', () => {
+            reject({ success: false, file, error: { message: '네트워크 오류' } });
+          });
+          
+          // 타임아웃 이벤트 리스너
+          xhr.addEventListener('timeout', () => {
+            reject({ success: false, file, error: { message: '업로드 타임아웃' } });
+          });
+          
+          // 요청 설정
+          xhr.open('POST', `${process.env.NEXT_PUBLIC_API_BASE_URL}/s3/upload/normal`);
+          xhr.timeout = timeout;
+          
+          // 인증 헤더 추가 (필요한 경우)
+          const token = localStorage.getItem('token');
+          if (token) {
+            xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+          }
+          
+          // 요청 전송
+          console.log(`📤 요청 전송 시작: ${file.name}`);
+          xhr.send(formData);
+        });
         
       } catch (error: any) {
         console.error(`❌ 파일 업로드 실패: ${file.name} (시도: ${retryCount + 1})`, {
@@ -579,22 +630,7 @@ const handleDetailChange = async (e: ChangeEvent<HTMLInputElement>) => {
         // 업로드 시작 상태로 변경
         setUploadProgress(prev => new Map(prev.set(file.name, { status: 'uploading', progress: 0 })));
         
-        // 진행률 시뮬레이션
-        const progressInterval = setInterval(() => {
-          setUploadProgress(prev => {
-            const current = prev.get(file.name);
-            if (current && current.status === 'uploading' && current.progress !== undefined) {
-              const newProgress = Math.min(current.progress + Math.random() * 20, 90);
-              return new Map(prev.set(file.name, { ...current, progress: newProgress }));
-            }
-            return prev;
-          });
-        }, 200);
-        
         const result = await uploadFile(file);
-        
-        // 진행률 인터벌 정리
-        clearInterval(progressInterval);
         results.push(result);
         
         // 업로드 결과에 따라 상태 업데이트
@@ -638,22 +674,7 @@ const handleDetailChange = async (e: ChangeEvent<HTMLInputElement>) => {
           // 업로드 시작 상태로 변경
           setUploadProgress(prev => new Map(prev.set(file.name, { status: 'uploading', progress: 0 })));
           
-          // 진행률 시뮬레이션
-          const progressInterval = setInterval(() => {
-            setUploadProgress(prev => {
-              const current = prev.get(file.name);
-              if (current && current.status === 'uploading' && current.progress !== undefined) {
-                const newProgress = Math.min(current.progress + Math.random() * 20, 90);
-                return new Map(prev.set(file.name, { ...current, progress: newProgress }));
-              }
-              return prev;
-            });
-          }, 200);
-          
           const result = await uploadFile(file);
-          
-          // 진행률 인터벌 정리
-          clearInterval(progressInterval);
           
           // 업로드 결과에 따라 상태 업데이트
           if (result.success) {
@@ -1311,6 +1332,8 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
     
     // 모달 상태 초기화
     setDetailModalOpen(true);
+    
+
     
     // 초기 데이터 설정 (즉시 표시)
     setDetailModalMarker(marker);
@@ -2570,22 +2593,27 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
               {(() => {
                 const detailImages = detailModalMarker.images?.filter(img => img.imageType === 'detail' || img.imageType === 'gallery') || [];
                 if (detailImages.length === 0) return null;
+                
                 return (
                   <div>
-                    <h3 className="text-lg font-semibold text-blue-700 mb-3 text-center">상세 이미지</h3>
+                    <div className="mb-3">
+                      <h3 className="text-lg font-semibold text-blue-700 text-center">상세 이미지 ({detailImages.length}장)</h3>
+                    </div>
+                    
+                    {/* 상세 이미지 그리드 */}
                     <div className="grid grid-cols-3 gap-3">
-                      {detailImages.slice(0, 6).map((img, idx) => (
+                      {detailImages.map((img, idx) => (
                         <div key={idx} className="aspect-square">
                           <img
                             src={getFullImageUrl(img.imageUrl)}
-                            alt={`상세이미지${idx+1}`}
+                            alt={`상세이미지${idx + 1}`}
                             className="w-full h-full object-cover rounded-xl shadow-md border border-gray-200 cursor-pointer hover:scale-105 transition-transform duration-200"
                             onClick={() => {
                               if (img.imageUrl) {
                                 const fullUrl = getFullImageUrl(img.imageUrl);
                                 if (fullUrl) {
-                                  console.log('🖱️ 마커 상세 모달 이미지 클릭됨:', { imageUrl: img.imageUrl, fileName: `상세이미지${idx+1}` });
-                                  openImageDetailModal(fullUrl, `상세이미지${idx+1}`);
+                                  console.log('🖱️ 마커 상세 모달 이미지 클릭됨:', { imageUrl: img.imageUrl, fileName: `상세이미지${idx + 1}` });
+                                  openImageDetailModal(fullUrl, `상세이미지${idx + 1}`);
                                 }
                               }
                             }}
@@ -2594,6 +2622,8 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                         </div>
                       ))}
                     </div>
+                    
+
                   </div>
                 );
               })()}
