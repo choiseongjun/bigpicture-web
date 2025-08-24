@@ -2537,7 +2537,7 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
         }
       })() && (
         <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/70">
-          <div className="relative bg-white rounded-3xl shadow-2xl max-w-lg w-full flex flex-col overflow-hidden border border-blue-100">
+          <div className="relative bg-white rounded-3xl shadow-2xl max-w-lg w-full h-[700px] flex flex-col overflow-y-auto border border-blue-100">
             <button className="absolute top-4 right-4 text-3xl text-blue-400 hover:text-blue-700 z-10 bg-white rounded-full shadow p-2 transition" onClick={() => setDetailModalOpen(false)}>&times;</button>
             
             {/* 네비게이션 컨트롤 - 여러 마커가 있을 때만 표시 */}
@@ -2628,7 +2628,7 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                 );
               })()}
             </div>
-            {/* 정보 카드 */}
+            {/* 정보 카드 - 스크롤 영역에 포함 */}
             <div className="p-6 flex flex-col gap-3 border-t border-blue-100 bg-white">
               <div className="flex items-center gap-3 mb-2">
                 <span className="font-semibold text-lg text-blue-700 flex items-center gap-1">
@@ -2957,13 +2957,13 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
         </div>
       )}
 
-      {/* 이미지 상세보기 모달 - 고정 위치 + 스크롤 방식 */}
+      {/* 이미지 상세보기 모달 - 고정 위치 + 내부 스크롤 */}
       {imageDetailModal.open && (
         <div className="fixed inset-0 z-[9999] bg-black/90 backdrop-blur-sm">
-          {/* 모달 컨테이너 - 상단 20% 아래 고정 */}
-          <div className="relative w-full h-full pt-[20%]">
-            <div className="bg-white rounded-t-3xl shadow-2xl h-full overflow-hidden">
-              {/* 모달 헤더 */}
+          {/* 모달 컨테이너 - 상단 20% 아래 고정, 높이 고정 */}
+          <div className="absolute top-[20%] left-0 right-0 h-[80%]">
+            <div className="bg-white rounded-t-3xl shadow-2xl h-full flex flex-col">
+              {/* 모달 헤더 - 고정 */}
               <div className="flex items-center justify-between p-4 bg-white border-b border-gray-200 flex-shrink-0">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
@@ -2986,25 +2986,20 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                 </button>
               </div>
 
-              {/* 이미지 컨테이너 - 스크롤 가능 */}
+              {/* 이미지 컨테이너 - 내부 스크롤만 */}
               <div className="flex-1 overflow-y-auto bg-white p-4">
-                <div className="flex justify-center items-center min-h-full">
+                <div className="flex justify-center">
                   <img
                     src={imageDetailModal.imageUrl}
                     alt={imageDetailModal.fileName}
-                    className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
+                    className="max-w-full object-contain rounded-lg shadow-lg"
                     style={{ 
-                      maxWidth: '100%', 
-                      maxHeight: 'calc(100vh - 200px)',
-                      width: 'auto',
-                      height: 'auto'
+                      maxWidth: '100%',
+                      height: '700px'
                     }}
                   />
                 </div>
               </div>
-
-              {/* 하단 액션 버튼 */}
-              
             </div>
           </div>
         </div>
