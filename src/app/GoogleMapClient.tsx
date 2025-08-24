@@ -535,28 +535,38 @@ const handleDetailChange = async (e: ChangeEvent<HTMLInputElement>) => {
       }
     };
     
-    // 동시다발적 병렬 업로드 (빠른 처리)
-    console.log('🚀 병렬 업로드 시작 - 모든 파일을 동시에 처리');
+    // iOS와 데스크톱에 따른 업로드 방식 분기
+    let uploadResults: any[] = [];
     
-    // 모든 파일의 진행 상황을 pending으로 초기화
-    newFiles.forEach(file => {
-      setUploadProgress(prev => new Map(prev.set(file.name, { status: 'pending' })));
-    });
-    
-    // 모든 파일을 동시에 업로드 시작
-    const uploadPromises = newFiles.map(async (file) => {
-      try {
-        console.log(`📤 파일 업로드 시작: ${file.name}`);
+    if (isIOS) {
+      // iOS: 순차 업로드 (안정성 우선)
+      console.log('🍎 iOS 감지 - 순차 업로드로 진행');
+      
+      const results = [];
+      for (let i = 0; i < newFiles.length; i++) {
+        const file = newFiles[i];
+        
+        // 업로드 진행 상황 초기화
+        setUploadProgress(prev => new Map(prev.set(file.name, { status: 'pending' })));
+        
+        // iOS에서 충분한 대기시간 (메모리 정리 시간 포함)
+        if (i > 0) {
+          const waitTime = 2000; // iOS: 2초
+          console.log(`⏳ 다음 파일 업로드 대기 중... ${waitTime/1000}초`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+        }
+        
+        console.log(`📤 iOS 파일 ${i + 1}/${newFiles.length} 업로드 시작: ${file.name}`);
         
         // 업로드 시작 상태로 변경
         setUploadProgress(prev => new Map(prev.set(file.name, { status: 'uploading', progress: 0 })));
         
-        // 진행률 시뮬레이션 (실제 업로드 진행률을 알 수 없으므로 단계별로 표시)
+        // 진행률 시뮬레이션
         const progressInterval = setInterval(() => {
           setUploadProgress(prev => {
             const current = prev.get(file.name);
             if (current && current.status === 'uploading' && current.progress !== undefined) {
-              const newProgress = Math.min(current.progress + Math.random() * 20, 90); // 90%까지만
+              const newProgress = Math.min(current.progress + Math.random() * 20, 90);
               return new Map(prev.set(file.name, { ...current, progress: newProgress }));
             }
             return prev;
@@ -567,36 +577,96 @@ const handleDetailChange = async (e: ChangeEvent<HTMLInputElement>) => {
         
         // 진행률 인터벌 정리
         clearInterval(progressInterval);
+        results.push(result);
         
         // 업로드 결과에 따라 상태 업데이트
         if (result.success) {
           setUploadProgress(prev => new Map(prev.set(file.name, { status: 'success', progress: 100 })));
-          console.log(`✅ 업로드 성공: ${file.name}`);
         } else {
           setUploadProgress(prev => new Map(prev.set(file.name, { 
             status: 'error', 
             progress: 0, 
             error: result.error?.message || '업로드 실패' 
           })));
-          console.log(`❌ 업로드 실패: ${file.name}`);
         }
         
-        return result;
-      } catch (error) {
-        console.error(`💥 업로드 중 예외 발생: ${file.name}`, error);
-        setUploadProgress(prev => new Map(prev.set(file.name, { 
-          status: 'error', 
-          progress: 0, 
-          error: '업로드 중 오류 발생' 
-        })));
-        return { success: false, file, error };
+        const status = result.success ? '✅ 성공' : '❌ 실패';
+        console.log(`📊 iOS 업로드 진행: ${i + 1}/${newFiles.length} - ${status}`);
+        
+        // iOS에서 실패 시 즉시 중단 (메모리 절약)
+        if (!result.success && i === 0) {
+          console.log('🛑 iOS 첫 번째 파일 업로드 실패로 중단');
+          break;
+        }
       }
-    });
-    
-    // 모든 업로드가 완료될 때까지 대기
-    console.log('⏳ 모든 업로드 완료 대기 중...');
-    const uploadResults = await Promise.all(uploadPromises);
-    console.log('🎉 모든 업로드 완료!');
+      
+      const uploadResults = results;
+      console.log('🍎 iOS 순차 업로드 완료!');
+      
+    } else {
+      // 데스크톱: 병렬 업로드 (속도 우선)
+      console.log('💻 데스크톱 감지 - 병렬 업로드로 진행');
+      
+      // 모든 파일의 진행 상황을 pending으로 초기화
+      newFiles.forEach(file => {
+        setUploadProgress(prev => new Map(prev.set(file.name, { status: 'pending' })));
+      });
+      
+      // 모든 파일을 동시에 업로드 시작
+      const uploadPromises = newFiles.map(async (file) => {
+        try {
+          console.log(`📤 파일 업로드 시작: ${file.name}`);
+          
+          // 업로드 시작 상태로 변경
+          setUploadProgress(prev => new Map(prev.set(file.name, { status: 'uploading', progress: 0 })));
+          
+          // 진행률 시뮬레이션
+          const progressInterval = setInterval(() => {
+            setUploadProgress(prev => {
+              const current = prev.get(file.name);
+              if (current && current.status === 'uploading' && current.progress !== undefined) {
+                const newProgress = Math.min(current.progress + Math.random() * 20, 90);
+                return new Map(prev.set(file.name, { ...current, progress: newProgress }));
+              }
+              return prev;
+            });
+          }, 200);
+          
+          const result = await uploadFile(file);
+          
+          // 진행률 인터벌 정리
+          clearInterval(progressInterval);
+          
+          // 업로드 결과에 따라 상태 업데이트
+          if (result.success) {
+            setUploadProgress(prev => new Map(prev.set(file.name, { status: 'success', progress: 100 })));
+            console.log(`✅ 업로드 성공: ${file.name}`);
+          } else {
+            setUploadProgress(prev => new Map(prev.set(file.name, { 
+              status: 'error', 
+              progress: 0, 
+              error: result.error?.message || '업로드 실패' 
+            })));
+            console.log(`❌ 업로드 실패: ${file.name}`);
+          }
+          
+          return result;
+        } catch (error) {
+          console.error(`💥 업로드 중 예외 발생: ${file.name}`, error);
+          setUploadProgress(prev => new Map(prev.set(file.name, { 
+            status: 'error', 
+            progress: 0, 
+            error: '업로드 중 오류 발생' 
+          })));
+          return { success: false, file, error };
+        }
+      });
+      
+      // 모든 업로드가 완료될 때까지 대기
+      console.log('⏳ 모든 업로드 완료 대기 중...');
+      const uploadResults = await Promise.all(uploadPromises);
+      console.log('🎉 데스크톱 병렬 업로드 완료!');
+    }
     
     console.log('모든 업로드 완료 - 결과:', uploadResults);
     
