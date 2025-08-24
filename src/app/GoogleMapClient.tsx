@@ -2957,67 +2957,55 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
         </div>
       )}
 
-      {/* 이미지 상세보기 모달 */}
+      {/* 이미지 상세보기 모달 - 고정 위치 + 스크롤 방식 */}
       {imageDetailModal.open && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/0 backdrop-blur-sm">
-          <div className="relative max-w-[90vw] max-h-[90vh] bg-white rounded-2xl shadow-2xl overflow-hidden">
-            {/* 모달 헤더 */}
-            <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                  <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        <div className="fixed inset-0 z-[9999] bg-black/90 backdrop-blur-sm">
+          {/* 모달 컨테이너 - 상단 20% 아래 고정 */}
+          <div className="relative w-full h-full pt-[20%]">
+            <div className="bg-white rounded-t-3xl shadow-2xl h-full overflow-hidden">
+              {/* 모달 헤더 */}
+              <div className="flex items-center justify-between p-4 bg-white border-b border-gray-200 flex-shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                    <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-lg font-semibold text-gray-900 truncate">이미지 상세보기</h3>
+                    <p className="text-sm text-gray-500 truncate">{imageDetailModal.fileName}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={closeImageDetailModal}
+                  className="p-3 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors flex-shrink-0"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">이미지 상세보기</h3>
-                  <p className="text-sm text-gray-500">{imageDetailModal.fileName}</p>
+                </button>
+              </div>
+
+              {/* 이미지 컨테이너 - 스크롤 가능 */}
+              <div className="flex-1 overflow-y-auto bg-white p-4">
+                <div className="flex justify-center items-center min-h-full">
+                  <img
+                    src={imageDetailModal.imageUrl}
+                    alt={imageDetailModal.fileName}
+                    className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
+                    style={{ 
+                      maxWidth: '100%', 
+                      maxHeight: 'calc(100vh - 200px)',
+                      width: 'auto',
+                      height: 'auto'
+                    }}
+                  />
                 </div>
               </div>
-              <button
-                onClick={closeImageDetailModal}
-                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
 
-            {/* 이미지 컨테이너 */}
-            <div className="p-6 bg-white">
-              <div className="flex justify-center">
-                <img
-                  src={imageDetailModal.imageUrl}
-                  alt={imageDetailModal.fileName}
-                  className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-lg"
-                  style={{ maxWidth: '100%', maxHeight: '70vh' }}
-                />
-              </div>
-            </div>
-
-            {/* 하단 액션 버튼 */}
-            {/* <div className="flex items-center justify-center gap-4 p-4 border-t border-gray-200 bg-gray-50">
-              <button
-                onClick={() => {
-                  // 새 탭에서 이미지 열기
-                  window.open(imageDetailModal.imageUrl, '_blank');
-                }}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                </svg>
-                새 탭에서 열기
-              </button>
+              {/* 하단 액션 버튼 */}
               
-              <button
-                onClick={closeImageDetailModal}
-                className="px-4 py-2 text-gray-600 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
-              >
-                닫기
-              </button>
-            </div> */}
+            </div>
           </div>
         </div>
       )}
