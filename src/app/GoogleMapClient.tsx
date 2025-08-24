@@ -100,6 +100,8 @@ export default function GoogleMapClient() {
   const [detailUrls, setDetailUrls] = useState<string[]>([]);
   const [isThumbnailUploading, setIsThumbnailUploading] = useState(false);
   const [isDetailUploading, setIsDetailUploading] = useState(false);
+  // 개별 파일 업로드 진행 상황 추적
+  const [uploadProgress, setUploadProgress] = useState<Map<string, { status: 'pending' | 'uploading' | 'success' | 'error'; progress?: number; error?: string }>>(new Map());
   const [description, setDescription] = useState('');
   const [emotionTag, setEmotionTag] = useState('');
   const [emotionTags, setEmotionTags] = useState<string[]>([]);
@@ -533,51 +535,73 @@ const handleDetailChange = async (e: ChangeEvent<HTMLInputElement>) => {
       }
     };
     
-    // iOS에서 매우 느린 순차 업로드
-    for (let i = 0; i < newFiles.length; i++) {
-      const file = newFiles[i];
-      
-      // iOS에서 충분한 대기시간 (메모리 정리 시간 포함)
-      if (i > 0) {
-        const waitTime = isIOS ? 3000 : 500; // iOS: 3초, 데스크톱: 0.5초
-        console.log(`⏳ 다음 파일 업로드 대기 중... ${waitTime/1000}초`);
-        await new Promise(resolve => setTimeout(resolve, waitTime));
+    // 동시다발적 병렬 업로드 (빠른 처리)
+    console.log('🚀 병렬 업로드 시작 - 모든 파일을 동시에 처리');
+    
+    // 모든 파일의 진행 상황을 pending으로 초기화
+    newFiles.forEach(file => {
+      setUploadProgress(prev => new Map(prev.set(file.name, { status: 'pending' })));
+    });
+    
+    // 모든 파일을 동시에 업로드 시작
+    const uploadPromises = newFiles.map(async (file) => {
+      try {
+        console.log(`📤 파일 업로드 시작: ${file.name}`);
         
-        // iOS에서 가비지 컬렉션 시도
-        if (isIOS) {
-          try {
-            // 메모리 정리 힌트
-            const performance = window.performance as any;
-            if (performance?.memory) {
-              console.log('메모리 사용량:', {
-                used: Math.round(performance.memory.usedJSHeapSize / 1048576) + 'MB',
-                total: Math.round(performance.memory.totalJSHeapSize / 1048576) + 'MB'
-              });
+        // 업로드 시작 상태로 변경
+        setUploadProgress(prev => new Map(prev.set(file.name, { status: 'uploading', progress: 0 })));
+        
+        // 진행률 시뮬레이션 (실제 업로드 진행률을 알 수 없으므로 단계별로 표시)
+        const progressInterval = setInterval(() => {
+          setUploadProgress(prev => {
+            const current = prev.get(file.name);
+            if (current && current.status === 'uploading' && current.progress !== undefined) {
+              const newProgress = Math.min(current.progress + Math.random() * 20, 90); // 90%까지만
+              return new Map(prev.set(file.name, { ...current, progress: newProgress }));
             }
-          } catch (e) {
-            // 무시
-          }
+            return prev;
+          });
+        }, 200);
+        
+        const result = await uploadFile(file);
+        
+        // 진행률 인터벌 정리
+        clearInterval(progressInterval);
+        
+        // 업로드 결과에 따라 상태 업데이트
+        if (result.success) {
+          setUploadProgress(prev => new Map(prev.set(file.name, { status: 'success', progress: 100 })));
+          console.log(`✅ 업로드 성공: ${file.name}`);
+        } else {
+          setUploadProgress(prev => new Map(prev.set(file.name, { 
+            status: 'error', 
+            progress: 0, 
+            error: result.error?.message || '업로드 실패' 
+          })));
+          console.log(`❌ 업로드 실패: ${file.name}`);
         }
+        
+        return result;
+      } catch (error) {
+        console.error(`💥 업로드 중 예외 발생: ${file.name}`, error);
+        setUploadProgress(prev => new Map(prev.set(file.name, { 
+          status: 'error', 
+          progress: 0, 
+          error: '업로드 중 오류 발생' 
+        })));
+        return { success: false, file, error };
       }
-      
-      console.log(`📤 파일 ${i + 1}/${newFiles.length} 업로드 시작: ${file.name}`);
-      const result = await uploadFile(file);
-      results.push(result);
-      
-      const status = result.success ? '✅ 성공' : '❌ 실패';
-      console.log(`📊 업로드 진행: ${i + 1}/${newFiles.length} - ${status}`);
-      
-      // iOS에서 실패 시 즉시 중단 (메모리 절약)
-      if (isIOS && !result.success && i === 0) {
-        console.log('🛑 첫 번째 파일 업로드 실패로 중단');
-        break;
-      }
-    }
+    });
     
-    console.log('모든 업로드 완료 - 결과:', results);
+    // 모든 업로드가 완료될 때까지 대기
+    console.log('⏳ 모든 업로드 완료 대기 중...');
+    const uploadResults = await Promise.all(uploadPromises);
+    console.log('🎉 모든 업로드 완료!');
     
-    const successfulUploads = results.filter(result => result.success);
-    const failedUploads = results.filter(result => !result.success);
+    console.log('모든 업로드 완료 - 결과:', uploadResults);
+    
+    const successfulUploads = uploadResults.filter(result => result.success);
+    const failedUploads = uploadResults.filter(result => !result.success);
     
     console.log('성공한 업로드:', successfulUploads.length, '실패한 업로드:', failedUploads.length);
     
@@ -623,9 +647,13 @@ const handleDetailChange = async (e: ChangeEvent<HTMLInputElement>) => {
     // 전체 실패 시 새로 추가된 파일들 제거
     setDetailFiles(detailFiles);
     setDetailPreviews(detailPreviews);
-  } finally {
-    setIsDetailUploading(false);
-  }
+      } finally {
+      setIsDetailUploading(false);
+      // 업로드 완료 후 진행 상황 정리 (3초 후)
+      setTimeout(() => {
+        setUploadProgress(new Map());
+      }, 3000);
+    }
 };
 
   const fetchMarkers = useCallback(async (bounds: google.maps.LatLngBounds) => {
@@ -2049,8 +2077,44 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                     </div>
                   </div>
 
+                  {/* 업로드 진행 상황 표시 */}
                   {isDetailUploading && (
-                    <div className="text-xs text-blue-600 mt-1">업로딩 중...</div>
+                    <div className="mt-3 space-y-2">
+                      <div className="text-xs text-blue-600 font-medium">업로드 진행 상황</div>
+                      {Array.from(uploadProgress.entries()).map(([fileName, progress]) => (
+                        <div key={fileName} className="bg-gray-50 rounded-lg p-2">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-xs text-gray-700 truncate flex-1 mr-2">{fileName}</span>
+                            <span className="text-xs font-medium">
+                              {progress.status === 'pending' && '대기 중'}
+                              {progress.status === 'uploading' && '업로드 중'}
+                              {progress.status === 'success' && '✅ 완료'}
+                              {progress.status === 'error' && '❌ 실패'}
+                            </span>
+                          </div>
+                          
+                          {/* 진행 바 */}
+                          {progress.status === 'uploading' && (
+                            <div className="w-full bg-gray-200 rounded-full h-2">
+                              <div 
+                                className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                                style={{ width: `${progress.progress || 0}%` }}
+                              />
+                            </div>
+                          )}
+                          
+                          {/* 에러 메시지 */}
+                          {progress.status === 'error' && progress.error && (
+                            <div className="text-xs text-red-600 mt-1">{progress.error}</div>
+                          )}
+                          
+                          {/* 성공 메시지 */}
+                          {progress.status === 'success' && (
+                            <div className="text-xs text-green-600 mt-1">업로드 완료!</div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </label>
               
