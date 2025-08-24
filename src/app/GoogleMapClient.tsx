@@ -464,25 +464,55 @@ export default function GoogleMapClient() {
     }));
     setDetailPreviews([...detailPreviews, ...newPreviews]);
     
-    // 새 파일들만 업로드
+    // 새 파일들만 업로드 - 병렬 처리로 성능 향상
     setIsDetailUploading(true);
     try {
       const uploadPromises = newFiles.map(async (file) => {
-        const formData = new FormData();
-        formData.append('image', file);
-        const res = await apiClient.post('/s3/upload/normal', formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        });
-        const fullS3Url = `https://bigpicture-jun-dev.s3.ap-northeast-2.amazonaws.com${res.data.s3_url}`;
-        return fullS3Url;
+        try {
+          const formData = new FormData();
+          formData.append('image', file);
+          const res = await apiClient.post('/s3/upload/normal', formData, {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+            },
+          });
+          const fullS3Url = `https://bigpicture-jun-dev.s3.ap-northeast-2.amazonaws.com${res.data.s3_url}`;
+          return { success: true, url: fullS3Url, file };
+        } catch (error) {
+          console.error(`파일 업로드 실패: ${file.name}`, error);
+          return { success: false, error, file };
+        }
       });
-      const newUrls = await Promise.all(uploadPromises);
-      setDetailUrls([...detailUrls, ...newUrls]);
+      
+      const results = await Promise.all(uploadPromises);
+      const successfulUploads = results.filter(result => result.success);
+      const failedUploads = results.filter(result => !result.success);
+      
+      if (successfulUploads.length > 0) {
+        const newUrls = successfulUploads.map(result => result.url).filter((url): url is string => url !== undefined);
+        setDetailUrls([...detailUrls, ...newUrls]);
+      }
+      
+      if (failedUploads.length > 0) {
+        console.warn(`${failedUploads.length}개 파일 업로드 실패:`, failedUploads.map(r => r.file.name));
+                          // 실패한 파일들만 제거하고 성공한 파일들은 유지
+         const failedFileNames = failedUploads.map(r => r.file.name);
+         const remainingFiles = allFiles.filter(file => !failedFileNames.includes(file.name));
+         
+         setDetailFiles(remainingFiles);
+         // 미리보기도 실패한 파일들 제거
+         setDetailPreviews(prev => prev.filter((_, index) => index < remainingFiles.length));
+        
+        if (failedUploads.length === newFiles.length) {
+          alert('모든 이미지 업로드에 실패했습니다.');
+        } else {
+          alert(`${failedUploads.length}개 이미지 업로드에 실패했습니다. 성공한 이미지만 저장됩니다.`);
+        }
+      }
     } catch (err) {
-      alert('상세 이미지 업로드 실패');
-      // 실패한 경우 새로 추가된 파일들만 제거
+      console.error('업로드 처리 중 오류:', err);
+      alert('이미지 업로드 처리 중 오류가 발생했습니다.');
+      // 전체 실패 시 새로 추가된 파일들 제거
       setDetailFiles(detailFiles);
       setDetailPreviews(detailPreviews);
     } finally {
