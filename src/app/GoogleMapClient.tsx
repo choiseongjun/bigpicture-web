@@ -600,7 +600,7 @@ const handleDetailChange = async (e: ChangeEvent<HTMLInputElement>) => {
         }
       }
       
-      const uploadResults = results;
+      uploadResults = results; // 여기를 수정
       console.log('🍎 iOS 순차 업로드 완료!');
       
     } else {
@@ -664,8 +664,9 @@ const handleDetailChange = async (e: ChangeEvent<HTMLInputElement>) => {
       
       // 모든 업로드가 완료될 때까지 대기
       console.log('⏳ 모든 업로드 완료 대기 중...');
-      const uploadResults = await Promise.all(uploadPromises);
+      uploadResults = await Promise.all(uploadPromises); // 여기를 수정
       console.log('🎉 데스크톱 병렬 업로드 완료!');
+      console.log('데스크톱 업로드 결과:', uploadResults);
     }
     
     console.log('모든 업로드 완료 - 결과:', uploadResults);
@@ -683,9 +684,35 @@ const handleDetailChange = async (e: ChangeEvent<HTMLInputElement>) => {
       // 함수형 업데이트로 상태 업데이트 보장
       setDetailUrls(prevUrls => {
         const updatedUrls = [...prevUrls, ...newUrls];
+        console.log('=== detailUrls 상태 업데이트 ===');
+        console.log('이전 detailUrls:', prevUrls);
+        console.log('새로 추가될 URLs:', newUrls);
         console.log('업데이트된 detailUrls:', updatedUrls);
+        console.log('업데이트된 detailUrls 길이:', updatedUrls.length);
+        
+        // 강제로 상태 확인 (디버깅용)
+        setTimeout(() => {
+          console.log('강제 확인 - detailUrls 상태:', updatedUrls);
+          console.log('강제 확인 - detailUrls 길이:', updatedUrls.length);
+        }, 0);
+        
         return updatedUrls;
       });
+      
+      // 강제 리렌더링을 위한 상태 업데이트
+      setDetailFiles(prevFiles => [...prevFiles]); // 강제 리렌더링
+      
+      // 추가 디버깅: 업로드 완료 후 상태 확인
+      console.log('업로드 완료 직후 - successfulUploads:', successfulUploads.length);
+      console.log('업로드 완료 직후 - newUrls:', newUrls);
+      
+      // 상태 업데이트 확인 (디버깅용)
+      setTimeout(() => {
+        console.log('=== 상태 업데이트 확인 ===');
+        console.log('현재 detailUrls 상태:', detailUrls);
+        console.log('현재 detailUrls 길이:', detailUrls.length);
+        console.log('UI에 표시될 카운트:', `${detailUrls.length}/10`);
+      }, 500);
     }
     
     if (failedUploads.length > 0) {
@@ -2150,7 +2177,13 @@ const getFullImageUrl = (imageUrl: string | undefined): string | undefined => {
                     />
                     <div className="w-[50px] h-[50px] border-2 border-blue-200 rounded-[5px] bg-gradient-to-br from-blue-50 to-indigo-50 flex flex-col items-center justify-center cursor-pointer hover:from-blue-100 hover:to-indigo-100 hover:border-blue-300 transition-all duration-200 shadow-sm">
                       <img src="/camera.svg" alt="카메라" className="w-6 h-6" style={{ filter: 'brightness(0) saturate(100%) invert(24%) sepia(94%) saturate(2476%) hue-rotate(217deg) brightness(118%) contrast(119%)' }} />
-                      <span className="text-xs text-blue-600 mt-1 font-medium" style={{ fontSize: '12px' }}>{detailUrls.length}/10</span>
+                      <span className="text-xs text-blue-600 mt-1 font-medium" style={{ fontSize: '12px' }}>
+                        {detailUrls.length}/10
+                        <br />
+                        {/* <span className="text-[10px] text-gray-500">
+                          상태: {detailUrls.length > 0 ? '이미지 있음' : '이미지 없음'}
+                        </span> */}
+                      </span>
                     </div>
                   </div>
 
