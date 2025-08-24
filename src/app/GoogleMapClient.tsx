@@ -442,7 +442,7 @@ export default function GoogleMapClient() {
     }
   };
 
- const handleDetailChange = async (e: ChangeEvent<HTMLInputElement>) => {
+const handleDetailChange = async (e: ChangeEvent<HTMLInputElement>) => {
   const newFiles = Array.from(e.target.files || []);
   
   // 새 파일이 없으면 (취소한 경우) 기존 파일들 유지
@@ -502,7 +502,7 @@ export default function GoogleMapClient() {
         // iOS에서 추가 헤더 설정 (연결 문제 해결)
         if (isIOS) {
           config.headers = {
-            ...config.headers,
+            ...config.headers
           };
         }
 
@@ -626,7 +626,7 @@ export default function GoogleMapClient() {
   } finally {
     setIsDetailUploading(false);
   }
-};;
+};
 
   const fetchMarkers = useCallback(async (bounds: google.maps.LatLngBounds) => {
     if (fetchTimeoutRef.current) {
