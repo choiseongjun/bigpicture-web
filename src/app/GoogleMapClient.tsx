@@ -442,96 +442,191 @@ export default function GoogleMapClient() {
     }
   };
 
-  const handleDetailChange = async (e: ChangeEvent<HTMLInputElement>) => {
-    const newFiles = Array.from(e.target.files || []);
-    
-    // 새 파일이 없으면 (취소한 경우) 기존 파일들 유지
-    if (newFiles.length === 0) {
-      return;
-    }
-    
-    // 기존 파일들과 새 파일들을 합침
-    const allFiles = [...detailFiles, ...newFiles];
-    setDetailFiles(allFiles);
-    
-    // 기존 미리보기와 새 미리보기를 합침
+ const handleDetailChange = async (e: ChangeEvent<HTMLInputElement>) => {
+  const newFiles = Array.from(e.target.files || []);
+  
+  // 새 파일이 없으면 (취소한 경우) 기존 파일들 유지
+  if (newFiles.length === 0) {
+    return;
+  }
+
+  // iOS 감지 (Safari, Chrome 모두 포함)
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  console.log('iOS 감지:', isIOS, 'User Agent:', navigator.userAgent);
+
+  // 기존 파일들과 새 파일들을 합침
+  const allFiles = [...detailFiles, ...newFiles];
+  setDetailFiles(allFiles);
+
+  // 미리보기 생성
+  setIsDetailUploading(true);
+  
+  try {
     const newPreviews = await Promise.all(newFiles.map(file => {
-      return new Promise<string>((resolve) => {
+      return new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = (ev) => resolve(ev.target?.result as string);
+        reader.onerror = () => reject(new Error(`파일 읽기 실패: ${file.name}`));
         reader.readAsDataURL(file);
       });
     }));
-    setDetailPreviews([...detailPreviews, ...newPreviews]);
     
-    // 새 파일들만 업로드 - 병렬 처리로 성능 향상
-    setIsDetailUploading(true);
-    try {
-      console.log('업로드 시작 - 파일 개수:', newFiles.length);
+    setDetailPreviews([...detailPreviews, ...newPreviews]);
+
+    console.log('업로드 시작 - 파일 개수:', newFiles.length, 'iOS:', isIOS);
+    
+    const results = [];
+    
+    // iOS에서는 매우 보수적인 업로드 설정
+    const uploadFile = async (file: File, retryCount = 0): Promise<any> => {
+      const maxRetries = 3;
+      const timeout = isIOS ? 60000 : 15000; // iOS: 60초 (매우 길게)
       
-      const results = [];
+      try {
+        console.log(`파일 업로드 시작: ${file.name} (${file.size} bytes) (시도: ${retryCount + 1}/${maxRetries + 1})`);
+        
+        // iOS에서 FormData를 새로 생성 (메모리 이슈 방지)
+        const formData = new FormData();
+        formData.append('image', file);
+        
+        // iOS에서 더 단순한 요청 설정
+        const config = {
+          timeout: timeout,
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+          maxContentLength: Infinity,
+          maxBodyLength: Infinity,
+        };
+
+        // iOS에서 추가 헤더 설정 (연결 문제 해결)
+        if (isIOS) {
+          config.headers = {
+            ...config.headers,
+          };
+        }
+
+        const res = await apiClient.post('/s3/upload/normal', formData, config);
+        
+        console.log(`✅ 업로드 성공: ${file.name}`, res.data);
+        const fullS3Url = `https://bigpicture-jun-dev.s3.ap-northeast-2.amazonaws.com${res.data.s3_url}`;
+        return { success: true, url: fullS3Url, file };
+        
+      } catch (error: any) {
+        console.error(`❌ 파일 업로드 실패: ${file.name} (시도: ${retryCount + 1})`, {
+          error: error.message,
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+          code: error.code,
+          timeout: error.code === 'ECONNABORTED',
+        });
+        
+        // iOS에서 모든 오류에 대해 재시도 (네트워크 불안정성 때문)
+        if (retryCount < maxRetries) {
+          const waitTime = (retryCount + 1) * 2000; // 2초, 4초, 6초
+          console.log(`🔄 재시도 예정: ${file.name} (${waitTime}ms 후)`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+          return uploadFile(file, retryCount + 1);
+        }
+        
+        return { success: false, file, error };
+      }
+    };
+    
+    // iOS에서 매우 느린 순차 업로드
+    for (let i = 0; i < newFiles.length; i++) {
+      const file = newFiles[i];
       
-      // 순차적으로 업로드 (모바일 친화적)
-      for (const file of newFiles) {
-        try {
-          console.log(`개별 파일 업로드 시작: ${file.name}`);
-          const formData = new FormData();
-          formData.append('image', file);
-          
-          const res = await apiClient.post('/s3/upload/normal', formData, {
-            headers: {
-              'Content-Type': 'multipart/form-data',
-            },
-          });
-          
-          console.log(`업로드 성공: ${file.name}`, res.data);
-          const fullS3Url = `https://bigpicture-jun-dev.s3.ap-northeast-2.amazonaws.com${res.data.s3_url}`;
-          results.push({ success: true, url: fullS3Url, file });
-        } catch (error) {
-          console.error(`파일 업로드 실패: ${file.name}`, error);
-          results.push({ success: false, file, error });
+      // iOS에서 충분한 대기시간 (메모리 정리 시간 포함)
+      if (i > 0) {
+        const waitTime = isIOS ? 3000 : 500; // iOS: 3초, 데스크톱: 0.5초
+        console.log(`⏳ 다음 파일 업로드 대기 중... ${waitTime/1000}초`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+        
+        // iOS에서 가비지 컬렉션 시도
+        if (isIOS) {
+          try {
+            // 메모리 정리 힌트
+            const performance = window.performance as any;
+            if (performance?.memory) {
+              console.log('메모리 사용량:', {
+                used: Math.round(performance.memory.usedJSHeapSize / 1048576) + 'MB',
+                total: Math.round(performance.memory.totalJSHeapSize / 1048576) + 'MB'
+              });
+            }
+          } catch (e) {
+            // 무시
+          }
         }
       }
       
-      console.log('순차 업로드 완료 - 결과:', results);
+      console.log(`📤 파일 ${i + 1}/${newFiles.length} 업로드 시작: ${file.name}`);
+      const result = await uploadFile(file);
+      results.push(result);
       
-      const successfulUploads = results.filter(result => result.success);
-      const failedUploads = results.filter(result => !result.success);
+      const status = result.success ? '✅ 성공' : '❌ 실패';
+      console.log(`📊 업로드 진행: ${i + 1}/${newFiles.length} - ${status}`);
       
-      console.log('성공한 업로드:', successfulUploads.length, '실패한 업로드:', failedUploads.length);
-      
-      if (successfulUploads.length > 0) {
-        const newUrls = successfulUploads.map(result => result.url).filter((url): url is string => url !== undefined);
-        console.log('성공한 URL들:', newUrls);
-        setDetailUrls([...detailUrls, ...newUrls]);
+      // iOS에서 실패 시 즉시 중단 (메모리 절약)
+      if (isIOS && !result.success && i === 0) {
+        console.log('🛑 첫 번째 파일 업로드 실패로 중단');
+        break;
       }
-      
-      if (failedUploads.length > 0) {
-        console.warn(`${failedUploads.length}개 파일 업로드 실패:`, failedUploads.map(r => r.file.name));
-        // 실패한 파일들만 제거하고 성공한 파일들은 유지
-        const failedFileNames = failedUploads.map(r => r.file.name);
-        const remainingFiles = allFiles.filter(file => !failedFileNames.includes(file.name));
-        
-        setDetailFiles(remainingFiles);
-        // 미리보기도 실패한 파일들 제거
-        setDetailPreviews(prev => prev.filter((_, index) => index < remainingFiles.length));
-        
-        if (failedUploads.length === newFiles.length) {
-          alert('모든 이미지 업로드에 실패했습니다.');
-        } else {
-          alert(`${failedUploads.length}개 이미지 업로드에 실패했습니다. 성공한 이미지만 저장됩니다.`);
-        }
-      }
-    } catch (err) {
-      console.error('업로드 처리 중 오류:', err);
-      alert('이미지 업로드 처리 중 오류가 발생했습니다.');
-      // 전체 실패 시 새로 추가된 파일들 제거
-      setDetailFiles(detailFiles);
-      setDetailPreviews(detailPreviews);
-    } finally {
-      setIsDetailUploading(false);
     }
-  };
+    
+    console.log('모든 업로드 완료 - 결과:', results);
+    
+    const successfulUploads = results.filter(result => result.success);
+    const failedUploads = results.filter(result => !result.success);
+    
+    console.log('성공한 업로드:', successfulUploads.length, '실패한 업로드:', failedUploads.length);
+    
+    if (successfulUploads.length > 0) {
+      const newUrls = successfulUploads.map(result => result.url).filter((url): url is string => url !== undefined);
+      console.log('성공한 URL들:', newUrls);
+      setDetailUrls([...detailUrls, ...newUrls]);
+    }
+    
+    if (failedUploads.length > 0) {
+      console.warn(`${failedUploads.length}개 파일 업로드 실패:`, failedUploads.map(r => r.file.name));
+      
+      // 실패한 파일들만 제거하고 성공한 파일들은 유지
+      const failedFileNames = failedUploads.map(r => r.file.name);
+      const remainingFiles = allFiles.filter(file => !failedFileNames.includes(file.name));
+      
+      setDetailFiles(remainingFiles);
+      
+      // 미리보기도 실패한 파일들에 해당하는 인덱스 제거
+      const successfulIndexes: number[] = [];
+      allFiles.forEach((file, index) => {
+        if (!failedFileNames.includes(file.name)) {
+          successfulIndexes.push(index);
+        }
+      });
+      
+      const remainingPreviews = detailPreviews.concat(newPreviews).filter((_, index) => 
+        successfulIndexes.includes(index)
+      );
+      setDetailPreviews(remainingPreviews);
+      
+      if (failedUploads.length === newFiles.length) {
+        alert('모든 이미지 업로드에 실패했습니다. 네트워크 상태를 확인하고 다시 시도해주세요.');
+      } else {
+        alert(`${failedUploads.length}개 이미지 업로드에 실패했습니다. 성공한 ${successfulUploads.length}개 이미지만 저장됩니다.`);
+      }
+    }
+    
+  } catch (err) {
+    console.error('업로드 처리 중 오류:', err);
+    alert('이미지 업로드 처리 중 오류가 발생했습니다. 파일 크기나 네트워크 상태를 확인해주세요.');
+    
+    // 전체 실패 시 새로 추가된 파일들 제거
+    setDetailFiles(detailFiles);
+    setDetailPreviews(detailPreviews);
+  } finally {
+    setIsDetailUploading(false);
+  }
+};;
 
   const fetchMarkers = useCallback(async (bounds: google.maps.LatLngBounds) => {
     if (fetchTimeoutRef.current) {
