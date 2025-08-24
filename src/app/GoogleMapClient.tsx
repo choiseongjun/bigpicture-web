@@ -674,11 +674,18 @@ const handleDetailChange = async (e: ChangeEvent<HTMLInputElement>) => {
     const failedUploads = uploadResults.filter(result => !result.success);
     
     console.log('성공한 업로드:', successfulUploads.length, '실패한 업로드:', failedUploads.length);
+    console.log('현재 detailUrls 상태:', detailUrls);
     
     if (successfulUploads.length > 0) {
       const newUrls = successfulUploads.map(result => result.url).filter((url): url is string => url !== undefined);
       console.log('성공한 URL들:', newUrls);
-      setDetailUrls([...detailUrls, ...newUrls]);
+      
+      // 함수형 업데이트로 상태 업데이트 보장
+      setDetailUrls(prevUrls => {
+        const updatedUrls = [...prevUrls, ...newUrls];
+        console.log('업데이트된 detailUrls:', updatedUrls);
+        return updatedUrls;
+      });
     }
     
     if (failedUploads.length > 0) {
