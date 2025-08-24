@@ -469,32 +469,31 @@ export default function GoogleMapClient() {
     try {
       console.log('업로드 시작 - 파일 개수:', newFiles.length);
       
-      const uploadPromises = newFiles.map((file) => {
-        return new Promise<{ success: boolean; url?: string; file: File; error?: any }>(async (resolve) => {
-          try {
-            console.log(`개별 파일 업로드 시작: ${file.name}`);
-            const formData = new FormData();
-            formData.append('image', file);
-            
-            const res = await apiClient.post('/s3/upload/normal', formData, {
-              headers: {
-                'Content-Type': 'multipart/form-data',
-              },
-            });
-            
-            console.log(`업로드 성공: ${file.name}`, res.data);
-            const fullS3Url = `https://bigpicture-jun-dev.s3.ap-northeast-2.amazonaws.com${res.data.s3_url}`;
-            resolve({ success: true, url: fullS3Url, file });
-          } catch (error) {
-            console.error(`파일 업로드 실패: ${file.name}`, error);
-            resolve({ success: false, file, error });
-          }
-        });
-      });
+      const results = [];
       
-      console.log('Promise.all 시작');
-      const results = await Promise.all(uploadPromises);
-      console.log('Promise.all 완료 - 결과:', results);
+      // 순차적으로 업로드 (모바일 친화적)
+      for (const file of newFiles) {
+        try {
+          console.log(`개별 파일 업로드 시작: ${file.name}`);
+          const formData = new FormData();
+          formData.append('image', file);
+          
+          const res = await apiClient.post('/s3/upload/normal', formData, {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+            },
+          });
+          
+          console.log(`업로드 성공: ${file.name}`, res.data);
+          const fullS3Url = `https://bigpicture-jun-dev.s3.ap-northeast-2.amazonaws.com${res.data.s3_url}`;
+          results.push({ success: true, url: fullS3Url, file });
+        } catch (error) {
+          console.error(`파일 업로드 실패: ${file.name}`, error);
+          results.push({ success: false, file, error });
+        }
+      }
+      
+      console.log('순차 업로드 완료 - 결과:', results);
       
       const successfulUploads = results.filter(result => result.success);
       const failedUploads = results.filter(result => !result.success);
